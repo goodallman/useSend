@@ -71,16 +71,6 @@ export class TeamService {
       return;
     }
 
-    if (!env.NEXT_PUBLIC_IS_CLOUD) {
-      const _team = await db.team.findFirst();
-      if (_team) {
-        throw new TRPCError({
-          message: "Can't have multiple teams in self hosted version",
-          code: "UNAUTHORIZED",
-        });
-      }
-    }
-
     const created = await db.team.create({
       data: {
         name,
