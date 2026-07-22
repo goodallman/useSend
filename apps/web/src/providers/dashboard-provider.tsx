@@ -4,7 +4,6 @@ import { useSession } from "next-auth/react";
 import { FullScreenLoading } from "~/components/FullScreenLoading";
 import { AddSesSettings } from "~/components/settings/AddSesSettings";
 import CreateTeam from "~/components/team/CreateTeam";
-import { env } from "~/env";
 import { api } from "~/trpc/react";
 import { TeamProvider } from "./team-context";
 
@@ -17,20 +16,17 @@ export const DashboardProvider = ({
   const { data: teams, status } = api.team.getTeams.useQuery();
   const { data: settings, status: settingsStatus } =
     api.admin.getSesSettings.useQuery(undefined, {
-      enabled: !env.NEXT_PUBLIC_IS_CLOUD || session?.user.isAdmin,
+      enabled: session?.user.isAdmin === true,
     });
 
   if (
     status === "pending" ||
-    (settingsStatus === "pending" && !env.NEXT_PUBLIC_IS_CLOUD)
+    (session?.user.isAdmin === true && settingsStatus === "pending")
   ) {
     return <FullScreenLoading />;
   }
 
-  if (
-    settings?.length === 0 &&
-    (!env.NEXT_PUBLIC_IS_CLOUD || session?.user.isAdmin)
-  ) {
+  if (session?.user.isAdmin === true && settings?.length === 0) {
     return <AddSesSettings />;
   }
 

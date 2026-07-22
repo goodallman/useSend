@@ -1,265 +1,121 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => {
-  const env = {
-    GITHUB_ID: "github-client-id",
-    GITHUB_SECRET: "github-client-secret",
-    NEXT_PUBLIC_IS_CLOUD: true,
-  };
-
-  const baseCreateUser = vi.fn();
-  const userFindUnique = vi.fn();
-  const userFindFirst = vi.fn();
-  const inviteFindFirst = vi.fn();
-  const transactionUserFindFirst = vi.fn();
-  const transactionInviteFindFirst = vi.fn();
-  const transactionUserCreate = vi.fn();
-  const executeRaw = vi.fn();
-  const transaction = vi.fn(async (callback) =>
-    callback({
-      $executeRaw: executeRaw,
-      user: {
-        findFirst: transactionUserFindFirst,
-        create: transactionUserCreate,
-      },
-      teamInvite: {
-        findFirst: transactionInviteFindFirst,
-      },
-    }),
-  );
-
-  return {
-    env,
-    baseCreateUser,
-    userFindUnique,
-    userFindFirst,
-    inviteFindFirst,
-    transactionUserFindFirst,
-    transactionInviteFindFirst,
-    transactionUserCreate,
-    executeRaw,
-    transaction,
-  };
-});
+const mocks = vi.hoisted(() => ({
+  verificationTokenDelete: vi.fn(),
+  userFindUnique: vi.fn(),
+}));
 
 vi.mock("next-auth", () => ({
   getServerSession: vi.fn(),
 }));
 
-vi.mock("@auth/prisma-adapter", () => ({
-  PrismaAdapter: vi.fn(() => ({ createUser: mocks.baseCreateUser })),
-}));
-
-vi.mock("next-auth/providers/github", () => ({
-  default: vi.fn((options) => ({ id: "github", options })),
-}));
-
-vi.mock("next-auth/providers/google", () => ({
-  default: vi.fn((options) => ({ id: "google", options })),
-}));
-
-vi.mock("next-auth/providers/email", () => ({
-  default: vi.fn((options) => ({ id: "email", options })),
+vi.mock("next-auth/providers/credentials", () => ({
+  default: vi.fn((options) => ({ id: "credentials", ...options })),
 }));
 
 vi.mock("~/server/db", () => ({
   db: {
+    verificationToken: {
+      delete: mocks.verificationTokenDelete,
+    },
     user: {
       findUnique: mocks.userFindUnique,
-      findFirst: mocks.userFindFirst,
     },
-    teamInvite: {
-      findFirst: mocks.inviteFindFirst,
-    },
-    $transaction: mocks.transaction,
   },
 }));
 
-vi.mock("~/server/mailer", () => ({
-  sendSignUpEmail: vi.fn(),
+vi.mock("~/server/auth/magic-link", () => ({
+  hashMagicLoginToken: vi.fn((token: string) => `hashed:${token}`),
+  MAGIC_LOGIN_IDENTIFIER_PREFIX: "noyra-user:",
 }));
 
-vi.mock("~/env", () => ({ env: mocks.env }));
+vi.mock("~/env", () => ({
+  env: {
+    ADMIN_EMAIL: "admin@example.com",
+  },
+}));
 
-import {
-  authOptions,
-  canRegisterSelfHostedUser,
-  SelfHostedRegistrationError,
-} from "~/server/auth";
+import { authOptions } from "~/server/auth";
 
-const newUser = {
-  id: "new-user",
-  name: "New User",
-  email: "new@example.com",
-  emailVerified: null,
+type Authorize = (
+  credentials: Record<string, string> | undefined,
+) => Promise<unknown>;
+
+const authorize = (
+  authOptions.providers[0] as unknown as { authorize: Authorize }
+).authorize;
+
+const user = {
+  id: 12,
+  name: "Noyra User",
+  email: "user@example.com",
   image: null,
-  isBetaUser: false,
+  isBetaUser: true,
   isWaitlisted: false,
-  isAdmin: false,
 };
 
-describe("authOptions", () => {
+describe("magic-link authentication", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.env.NEXT_PUBLIC_IS_CLOUD = true;
-    mocks.userFindUnique.mockResolvedValue(null);
-    mocks.userFindFirst.mockResolvedValue(null);
-    mocks.inviteFindFirst.mockResolvedValue(null);
-    mocks.transactionUserFindFirst.mockResolvedValue(null);
-    mocks.transactionInviteFindFirst.mockResolvedValue(null);
-    mocks.transactionUserCreate.mockResolvedValue({ ...newUser, id: 1 });
+    mocks.verificationTokenDelete.mockResolvedValue({
+      identifier: "noyra-user:12",
+      token: "hashed:raw-token",
+      expires: new Date(Date.now() + 60_000),
+    });
+    mocks.userFindUnique.mockResolvedValue(user);
   });
 
-  it("configures the GitHub provider with an explicit issuer", () => {
-    const githubProvider = authOptions.providers.find(
-      (provider) => provider.id === "github",
-    );
-
-    expect(githubProvider).toMatchObject({
-      id: "github",
-      options: {
-        clientId: "github-client-id",
-        clientSecret: "github-client-secret",
-        issuer: "https://github.com/login/oauth",
-      },
-    });
+  it("only configures the credentials provider with JWT sessions", () => {
+    expect(authOptions.session?.strategy).toBe("jwt");
+    expect(authOptions.providers).toHaveLength(1);
+    expect(authOptions.providers[0]).toMatchObject({ id: "credentials" });
   });
 
-  describe("self-hosted registration policy", () => {
-    beforeEach(() => {
-      mocks.env.NEXT_PUBLIC_IS_CLOUD = false;
+  it("consumes a one-time token and returns its user", async () => {
+    await expect(authorize({ token: "raw-token" })).resolves.toMatchObject({
+      id: 12,
+      email: "user@example.com",
+      isBetaUser: true,
+      isWaitlisted: false,
     });
 
-    it("allows the first user without an invite", async () => {
-      await expect(
-        canRegisterSelfHostedUser("first@example.com"),
-      ).resolves.toBe(true);
-
-      expect(mocks.inviteFindFirst).not.toHaveBeenCalled();
+    expect(mocks.verificationTokenDelete).toHaveBeenCalledWith({
+      where: { token: "hashed:raw-token" },
     });
-
-    it("allows an existing user to sign in without an invite", async () => {
-      mocks.userFindUnique.mockResolvedValue({ id: 1 });
-
-      await expect(
-        canRegisterSelfHostedUser("existing@example.com"),
-      ).resolves.toBe(true);
-
-      expect(mocks.userFindFirst).not.toHaveBeenCalled();
-      expect(mocks.inviteFindFirst).not.toHaveBeenCalled();
-    });
-
-    it("allows a new user with a matching invite", async () => {
-      mocks.userFindFirst.mockResolvedValue({ id: 1 });
-      mocks.inviteFindFirst.mockResolvedValue({ id: "invite_1" });
-
-      await expect(
-        canRegisterSelfHostedUser("invited@example.com"),
-      ).resolves.toBe(true);
-
-      expect(mocks.inviteFindFirst).toHaveBeenCalledWith({
-        where: { email: "invited@example.com" },
-        select: { id: true },
-      });
-    });
-
-    it("rejects a new user without a matching invite", async () => {
-      mocks.userFindFirst.mockResolvedValue({ id: 1 });
-
-      await expect(
-        canRegisterSelfHostedUser("random@example.com"),
-      ).resolves.toBe(false);
-    });
-
-    it("rejects a new account that has no email", async () => {
-      await expect(canRegisterSelfHostedUser(null)).resolves.toBe(false);
-      expect(mocks.userFindUnique).not.toHaveBeenCalled();
-    });
+    expect(mocks.userFindUnique).toHaveBeenCalledWith({ where: { id: 12 } });
   });
 
-  describe("adapter user creation", () => {
-    const createUser = authOptions.adapter?.createUser;
-
-    if (!createUser) {
-      throw new Error("Expected the auth adapter to support user creation");
-    }
-
-    it("keeps cloud user creation unchanged", async () => {
-      mocks.baseCreateUser.mockResolvedValue({ ...newUser, id: 1 });
-
-      await createUser(newUser);
-
-      expect(mocks.baseCreateUser).toHaveBeenCalledWith(newUser);
-      expect(mocks.transaction).not.toHaveBeenCalled();
+  it("rejects an expired token after consuming it", async () => {
+    mocks.verificationTokenDelete.mockResolvedValue({
+      identifier: "noyra-user:12",
+      token: "hashed:raw-token",
+      expires: new Date(Date.now() - 1),
     });
 
-    it("atomically creates the first self-hosted user", async () => {
-      mocks.env.NEXT_PUBLIC_IS_CLOUD = false;
+    await expect(authorize({ token: "raw-token" })).resolves.toBeNull();
+    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+  });
 
-      await expect(createUser(newUser)).resolves.toMatchObject({
-        id: 1,
-        email: newUser.email,
-      });
-
-      expect(mocks.transaction).toHaveBeenCalledOnce();
-      expect(mocks.executeRaw).toHaveBeenCalledOnce();
-      expect(mocks.executeRaw.mock.invocationCallOrder[0]!).toBeLessThan(
-        mocks.transactionUserFindFirst.mock.invocationCallOrder[0]!,
-      );
-      expect(mocks.transactionInviteFindFirst).not.toHaveBeenCalled();
-      expect(mocks.transactionUserCreate).toHaveBeenCalledWith({
-        data: {
-          name: newUser.name,
-          email: newUser.email,
-          emailVerified: newUser.emailVerified,
-          image: newUser.image,
-        },
-      });
+  it("rejects tokens that were not issued by Noyra", async () => {
+    mocks.verificationTokenDelete.mockResolvedValue({
+      identifier: "other:12",
+      token: "hashed:raw-token",
+      expires: new Date(Date.now() + 60_000),
     });
 
-    it("atomically creates an invited self-hosted user", async () => {
-      mocks.env.NEXT_PUBLIC_IS_CLOUD = false;
-      mocks.transactionUserFindFirst.mockResolvedValue({ id: 1 });
-      mocks.transactionInviteFindFirst.mockResolvedValue({ id: "invite_1" });
+    await expect(authorize({ token: "raw-token" })).resolves.toBeNull();
+    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+  });
 
-      await expect(createUser(newUser)).resolves.toMatchObject({
-        id: 1,
-        email: newUser.email,
-      });
+  it("rejects a token that was already consumed", async () => {
+    mocks.verificationTokenDelete.mockRejectedValue({ code: "P2025" });
 
-      expect(mocks.transactionInviteFindFirst).toHaveBeenCalledWith({
-        where: { email: newUser.email },
-        select: { id: true },
-      });
-      expect(mocks.transactionUserCreate).toHaveBeenCalledWith({
-        data: {
-          name: newUser.name,
-          email: newUser.email,
-          emailVerified: newUser.emailVerified,
-          image: newUser.image,
-        },
-      });
-    });
+    await expect(authorize({ token: "raw-token" })).resolves.toBeNull();
+    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+  });
 
-    it("does not create an uninvited self-hosted user", async () => {
-      mocks.env.NEXT_PUBLIC_IS_CLOUD = false;
-      mocks.transactionUserFindFirst.mockResolvedValue({ id: 1 });
-
-      await expect(createUser(newUser)).rejects.toBeInstanceOf(
-        SelfHostedRegistrationError,
-      );
-
-      expect(mocks.transactionUserCreate).not.toHaveBeenCalled();
-    });
-
-    it("does not create a self-hosted user without an email", async () => {
-      mocks.env.NEXT_PUBLIC_IS_CLOUD = false;
-
-      await expect(
-        createUser({ ...newUser, email: "" }),
-      ).rejects.toBeInstanceOf(SelfHostedRegistrationError);
-
-      expect(mocks.transaction).not.toHaveBeenCalled();
-    });
+  it("rejects malformed credentials without querying the database", async () => {
+    await expect(authorize({ token: "" })).resolves.toBeNull();
+    expect(mocks.verificationTokenDelete).not.toHaveBeenCalled();
   });
 });

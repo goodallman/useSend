@@ -1,13 +1,20 @@
-"use client";
-
 import { SettingsNavButton } from "../dev-settings/settings-nav-button";
 import { isCloud } from "~/utils/common";
+import { getServerAuthSession } from "~/server/auth";
+import { redirect } from "next/navigation";
 
-export default function AdminLayout({
+export const dynamic = "force-dynamic";
+
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getServerAuthSession();
+  if (!session?.user.isAdmin) {
+    redirect("/dashboard");
+  }
+
   return (
     <div>
       <h1 className="text-lg font-bold">Admin</h1>

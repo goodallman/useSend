@@ -29,14 +29,11 @@ export const env = createEnv({
       // VERCEL_URL doesn't include `https` so it cant be validated as a URL
       process.env.VERCEL ? z.string() : z.string().url(),
     ),
-    GITHUB_ID: z.string().optional(),
-    GITHUB_SECRET: z.string().optional(),
+    NOYRA_API_KEY: z.string().min(1).optional(),
     AWS_ACCESS_KEY_ID: z.string().optional(),
     AWS_SECRET_ACCESS_KEY: z.string().optional(),
     USESEND_API_KEY: z.string().optional(),
     UNSEND_API_KEY: z.string().optional(),
-    GOOGLE_CLIENT_ID: z.string().optional(),
-    GOOGLE_CLIENT_SECRET: z.string().optional(),
     AWS_SES_ENDPOINT: z.string().optional(),
     AWS_SNS_ENDPOINT: z.string().optional(),
     AWS_DEFAULT_REGION: z
@@ -72,9 +69,9 @@ export const env = createEnv({
     SMTP_USER: z.string().default("usesend"),
     CONTACT_BOOK_ID: z.string().optional(),
     EMAIL_CLEANUP_DAYS: z
-        .string()
-        .optional()
-        .transform((str) => (str ? parseInt(str, 10) : undefined)),
+      .string()
+      .optional()
+      .transform((str) => (str ? parseInt(str, 10) : undefined)),
   },
 
   /**
@@ -101,14 +98,13 @@ export const env = createEnv({
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    GITHUB_ID: process.env.GITHUB_ID,
-    GITHUB_SECRET: process.env.GITHUB_SECRET,
-    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY,
-    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || process.env.AWS_SECRET_KEY,
+    NOYRA_API_KEY: process.env.NOYRA_API_KEY,
+    AWS_ACCESS_KEY_ID:
+      process.env.AWS_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY,
+    AWS_SECRET_ACCESS_KEY:
+      process.env.AWS_SECRET_ACCESS_KEY || process.env.AWS_SECRET_KEY,
     USESEND_API_KEY: process.env.USESEND_API_KEY,
     UNSEND_API_KEY: process.env.UNSEND_API_KEY,
-    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     AWS_DEFAULT_REGION: process.env.AWS_DEFAULT_REGION,
     AWS_SES_ENDPOINT: process.env.AWS_SES_ENDPOINT,
     AWS_SNS_ENDPOINT: process.env.AWS_SNS_ENDPOINT,
