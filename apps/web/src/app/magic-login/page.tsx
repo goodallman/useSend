@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { getServerAuthSession } from "~/server/auth";
 import MagicLogin from "./magic-login";
 
 export const metadata: Metadata = {
@@ -14,10 +12,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function MagicLoginPage() {
-  const session = await getServerAuthSession();
-  if (session) redirect("/dashboard");
-
+export default function MagicLoginPage() {
   return (
     <main className="h-screen flex flex-col gap-6 justify-center items-center">
       <Image src="/logo-squircle.png" alt="useSend" width={50} height={50} />
