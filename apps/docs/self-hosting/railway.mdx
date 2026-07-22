@@ -42,21 +42,17 @@ AWS_SECRET_ACCESS_KEY=<secret-access-key>
 </Tip>
   </Step>
 
-  <Step title="GitHub app credentials for login">
-  useSend uses GitHub authentication for login.
-
-Use this link to [create a GitHub app](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/about-creating-github-apps)
-
-Callback URL : `https://<your-railway-domain>/api/auth/callback/github`
-
-![github app](/images/github-callback.png)
-
-Add the following environment variables in Railway.
+  <Step title="Account provisioning key">
+Add a long random secret in Railway. Login uses Noyra-issued, single-use magic
+links and does not expose public registration.
 
 ```env
-GITHUB_ID="<your-github-client-id>"
-GITHUB_SECRET="<your-github-client-secret>"
+NOYRA_API_KEY="<your-long-random-noyra-api-key>"
 ```
+
+Create accounts with `POST /api/noyra/accounts`, or issue a new link for an
+existing account with `POST /api/noyra/login-links`. Both require an
+`Authorization: Bearer <NOYRA_API_KEY>` header.
 
   </Step>
 
