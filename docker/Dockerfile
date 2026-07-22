@@ -75,6 +75,7 @@ COPY --from=installer --chown=nextjs:nodejs /app/apps/web/prisma/migrations ./ap
 COPY --from=installer --chown=nextjs:nodejs /app/apps/web/node_modules/@prisma ./node_modules/@prisma
 COPY --from=prisma-cli --chown=nextjs:nodejs /prisma-cli/node_modules ./node_modules
 COPY --chown=nextjs:nodejs docker/start.sh ./start.sh
+RUN sed -i 's/\r$//' ./start.sh && chmod 755 ./start.sh
 
 USER nextjs
 
