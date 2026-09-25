@@ -121,6 +121,11 @@ const emptyDocument: ReactEmailDocument = { type: "doc", content: [] };
 
 type EditorInstance = NonNullable<BaseEmailEditorRef["editor"]>;
 type TextSelectionRange = { from: number; to: number };
+type EditorActionHistory = {
+  undo: ReactEmailDocument[];
+  redo: ReactEmailDocument[];
+  applying: boolean;
+};
 type EditorNode = NonNullable<
   ReturnType<EditorInstance["state"]["doc"]["nodeAt"]>
 >;
@@ -185,7 +190,20 @@ function toPublicRef(
   getRef: () => BaseEmailEditorRef | null,
   getTextSelection: () => TextSelectionRange | null,
   getButtonPosition: () => number | null,
+  actionHistory: EditorActionHistory,
 ): ReactEmailEditorRef {
+  const markActionUpdate = () => {
+    actionHistory.applying = true;
+    queueMicrotask(() => {
+      actionHistory.applying = false;
+    });
+  };
+  const recordAction = (editor: EditorInstance) => {
+    actionHistory.undo.push(editor.getJSON());
+    if (actionHistory.undo.length > 100) actionHistory.undo.shift();
+    actionHistory.redo.length = 0;
+    markActionUpdate();
+  };
   const restoreTextSelection = (editor: EditorInstance) => {
     const selection = getTextSelection();
     return selection
@@ -210,11 +228,17 @@ function toPublicRef(
       const value = fallback
         ? `{{${name},fallback=${fallback}}}`
         : `{{${name}}}`;
-      getRef()?.editor?.chain().focus().insertContent(value).run();
+      const editor = getRef()?.editor;
+      if (!editor) return;
+      recordAction(editor);
+      editor.chain().focus().insertContent(value).run();
     },
     insertUnsubscribe: () => {
-      getRef()
-        ?.editor?.chain()
+      const editor = getRef()?.editor;
+      if (!editor) return;
+      recordAction(editor);
+      editor
+        .chain()
         .focus()
         .insertContent(
           '<p style="text-align: center; color: #6b7280; font-size: 12px"><a href="{{usesend_unsubscribe_url}}">Unsubscribe</a></p>',
@@ -222,8 +246,11 @@ function toPublicRef(
         .run();
     },
     insertButton: () => {
-      getRef()
-        ?.editor?.chain()
+      const editor = getRef()?.editor;
+      if (!editor) return;
+      recordAction(editor);
+      editor
+        .chain()
         .focus()
         .insertContent({
           type: "button",
@@ -232,8 +259,11 @@ function toPublicRef(
         .run();
     },
     insertDivider: () => {
-      getRef()
-        ?.editor?.chain()
+      const editor = getRef()?.editor;
+      if (!editor) return;
+      recordAction(editor);
+      editor
+        .chain()
         .focus()
         .insertContent({ type: "horizontalRule" })
         .run();
@@ -241,6 +271,13 @@ function toPublicRef(
     undo: () => {
       const editor = getRef()?.editor;
       if (!editor) return;
+      const previous = actionHistory.undo.pop();
+      if (previous) {
+        actionHistory.redo.push(editor.getJSON());
+        markActionUpdate();
+        editor.commands.setContent(previous);
+        return;
+      }
       (
         editor.chain().focus() as unknown as {
           undo: () => { run: () => boolean };
@@ -252,6 +289,13 @@ function toPublicRef(
     redo: () => {
       const editor = getRef()?.editor;
       if (!editor) return;
+      const next = actionHistory.redo.pop();
+      if (next) {
+        actionHistory.undo.push(editor.getJSON());
+        markActionUpdate();
+        editor.commands.setContent(next);
+        return;
+      }
       (
         editor.chain().focus() as unknown as {
           redo: () => { run: () => boolean };
@@ -263,6 +307,7 @@ function toPublicRef(
     setBlockType: (type) => {
       const editor = getRef()?.editor;
       if (!editor) return;
+      recordAction(editor);
       if (type === "paragraph") {
         restoreTextSelection(editor).clearNodes().setNode("paragraph").run();
         return;
@@ -276,17 +321,20 @@ function toPublicRef(
     setTextAlignment: (alignment) => {
       const editor = getRef()?.editor;
       if (!editor) return;
+      recordAction(editor);
       restoreTextSelection(editor).run();
       setTextAlignment(editor, alignment);
     },
     toggleMark: (mark) => {
       const editor = getRef()?.editor;
       if (!editor) return;
+      recordAction(editor);
       restoreTextSelection(editor).toggleMark(mark).run();
     },
     updateSelectedLink: (href) => {
       const editor = getRef()?.editor;
       if (!editor) return;
+      recordAction(editor);
       if (!href.trim()) {
         restoreTextSelection(editor)
           .extendMarkRange("link")
@@ -304,6 +352,7 @@ function toPublicRef(
       if (!editor) return;
       const activeButton = getEditableButton(editor);
       if (!activeButton) return;
+      recordAction(editor);
 
       const attrs = {
         ...activeButton.node.attrs,
@@ -343,6 +392,7 @@ function toPublicRef(
       if (!editor) return;
       const activeButton = getEditableButton(editor);
       if (!activeButton) return;
+      recordAction(editor);
       editor
         .chain()
         .focus()
@@ -353,6 +403,8 @@ function toPublicRef(
         .run();
     },
     setContent: (content) => {
+      actionHistory.undo.length = 0;
+      actionHistory.redo.length = 0;
       getRef()?.editor?.commands.setContent(content);
     },
   };
@@ -368,6 +420,11 @@ export const ReactEmailEditor = forwardRef<
   const editorRef = useRef<BaseEmailEditorRef>(null);
   const textSelectionRef = useRef<TextSelectionRange | null>(null);
   const buttonPositionRef = useRef<number | null>(null);
+  const actionHistoryRef = useRef<EditorActionHistory>({
+    undo: [],
+    redo: [],
+    applying: false,
+  });
   const selectionCleanupRef = useRef<(() => void) | null>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
@@ -381,6 +438,7 @@ export const ReactEmailEditor = forwardRef<
         () => editorRef.current,
         () => textSelectionRef.current,
         () => buttonPositionRef.current,
+        actionHistoryRef.current,
       ),
     [],
   );
@@ -450,6 +508,7 @@ export const ReactEmailEditor = forwardRef<
           () => ref,
           () => textSelectionRef.current,
           () => buttonPositionRef.current,
+          actionHistoryRef.current,
         ),
       );
     },
@@ -459,6 +518,10 @@ export const ReactEmailEditor = forwardRef<
   const handleUpdate = useCallback(
     (ref: BaseEmailEditorRef) => {
       editorRef.current = ref;
+      if (!actionHistoryRef.current.applying) {
+        actionHistoryRef.current.undo.length = 0;
+        actionHistoryRef.current.redo.length = 0;
+      }
       onDocumentChange?.(ref.getJSON());
     },
     [onDocumentChange],
