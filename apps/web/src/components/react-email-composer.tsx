@@ -134,6 +134,10 @@ export function ReactEmailComposer({
   onSavingChange,
 }: ReactEmailComposerProps) {
   const editorRef = useRef<ReactEmailEditorRef>(null);
+  const editorHistoryRef = useRef<{
+    undo: ReactEmailDocument[];
+    redo: ReactEmailDocument[];
+  }>({ undo: [], redo: [] });
   const parsedContent = useMemo(
     () => parseReactEmailContent(content),
     [content],
@@ -159,6 +163,44 @@ export function ReactEmailComposer({
   const [selectedButton, setSelectedButton] =
     useState<ReactEmailButtonState | null>(null);
 
+  const runEditorAction = (
+    // eslint-disable-next-line no-unused-vars
+    action: (editor: ReactEmailEditorRef) => void,
+  ) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editorHistoryRef.current.undo.push(editor.getDocument());
+    if (editorHistoryRef.current.undo.length > 100) {
+      editorHistoryRef.current.undo.shift();
+    }
+    editorHistoryRef.current.redo.length = 0;
+    action(editor);
+  };
+
+  const undoEditorAction = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const previous = editorHistoryRef.current.undo.pop();
+    if (!previous) {
+      editor.undo();
+      return;
+    }
+    editorHistoryRef.current.redo.push(editor.getDocument());
+    editor.setContent(previous);
+  };
+
+  const redoEditorAction = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const next = editorHistoryRef.current.redo.pop();
+    if (!next) {
+      editor.redo();
+      return;
+    }
+    editorHistoryRef.current.undo.push(editor.getDocument());
+    editor.setContent(next);
+  };
+
   useEffect(() => {
     setLinkDraft(editorState.linkHref);
   }, [editorState.hasTextSelection, editorState.linkHref]);
@@ -178,8 +220,10 @@ export function ReactEmailComposer({
 
   const updateButtonStyle = (changes: Record<string, string>) => {
     if (!selectedButton) return;
-    editorRef.current?.updateSelectedButton({
-      style: patchInlineStyle(selectedButton.style, changes),
+    runEditorAction((editor) => {
+      editor.updateSelectedButton({
+        style: patchInlineStyle(selectedButton.style, changes),
+      });
     });
   };
 
@@ -326,7 +370,9 @@ export function ReactEmailComposer({
                     <DropdownMenuItem
                       key={variable}
                       onSelect={() =>
-                        editorRef.current?.insertVariable(variable)
+                        runEditorAction((editor) =>
+                          editor.insertVariable(variable),
+                        )
                       }
                     >
                       <Braces className="text-muted-foreground" />
@@ -335,7 +381,9 @@ export function ReactEmailComposer({
                   ))}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onSelect={() => editorRef.current?.insertUnsubscribe()}
+                    onSelect={() =>
+                      runEditorAction((editor) => editor.insertUnsubscribe())
+                    }
                   >
                     <Link2 className="text-muted-foreground" />
                     Unsubscribe link
@@ -364,8 +412,10 @@ export function ReactEmailComposer({
                 value={editorState.blockType}
                 disabled={disabled || Boolean(selectedButton)}
                 onValueChange={(value) =>
-                  editorRef.current?.setBlockType(
-                    value as ReactEmailEditorState["blockType"],
+                  runEditorAction((editor) =>
+                    editor.setBlockType(
+                      value as ReactEmailEditorState["blockType"],
+                    ),
                   )
                 }
               >
@@ -402,7 +452,9 @@ export function ReactEmailComposer({
                   aria-pressed={editorState.marks[mark]}
                   title={label}
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => editorRef.current?.toggleMark(mark)}
+                  onClick={() =>
+                    runEditorAction((editor) => editor.toggleMark(mark))
+                  }
                 >
                   <Icon className="h-4 w-4" />
                 </Button>
@@ -430,7 +482,11 @@ export function ReactEmailComposer({
                   aria-pressed={editorState.alignment === alignment}
                   title={label}
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => editorRef.current?.setTextAlignment(alignment)}
+                  onClick={() =>
+                    runEditorAction((editor) =>
+                      editor.setTextAlignment(alignment),
+                    )
+                  }
                 >
                   <Icon className="h-4 w-4" />
                 </Button>
@@ -447,7 +503,7 @@ export function ReactEmailComposer({
                 aria-label="Undo"
                 title="Undo"
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => editorRef.current?.undo()}
+                onClick={undoEditorAction}
               >
                 <Undo2 className="h-4 w-4" />
               </Button>
@@ -460,7 +516,7 @@ export function ReactEmailComposer({
                 aria-label="Redo"
                 title="Redo"
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => editorRef.current?.redo()}
+                onClick={redoEditorAction}
               >
                 <Redo2 className="h-4 w-4" />
               </Button>
@@ -474,7 +530,9 @@ export function ReactEmailComposer({
                 className="h-8"
                 disabled={disabled}
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => editorRef.current?.insertButton()}
+                onClick={() =>
+                  runEditorAction((editor) => editor.insertButton())
+                }
               >
                 <Plus className="mr-1.5 h-4 w-4" /> Button
               </Button>
@@ -485,7 +543,9 @@ export function ReactEmailComposer({
                 className="h-8"
                 disabled={disabled}
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => editorRef.current?.insertDivider()}
+                onClick={() =>
+                  runEditorAction((editor) => editor.insertDivider())
+                }
               >
                 <Minus className="mr-1.5 h-4 w-4" /> Divider
               </Button>
@@ -517,7 +577,9 @@ export function ReactEmailComposer({
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault();
-                        editorRef.current?.updateSelectedLink(linkDraft);
+                        runEditorAction((editor) =>
+                          editor.updateSelectedLink(linkDraft),
+                        );
                         setLinkPanelOpen(false);
                       }
                     }}
@@ -530,7 +592,9 @@ export function ReactEmailComposer({
                   disabled={disabled || !linkDraft.trim()}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
-                    editorRef.current?.updateSelectedLink(linkDraft);
+                    runEditorAction((editor) =>
+                      editor.updateSelectedLink(linkDraft),
+                    );
                     setLinkPanelOpen(false);
                   }}
                 >
@@ -545,7 +609,9 @@ export function ReactEmailComposer({
                     disabled={disabled}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
-                      editorRef.current?.updateSelectedLink("");
+                      runEditorAction((editor) =>
+                        editor.updateSelectedLink(""),
+                      );
                       setLinkPanelOpen(false);
                     }}
                   >
@@ -590,9 +656,11 @@ export function ReactEmailComposer({
                       disabled={disabled}
                       className="h-9 bg-background"
                       onChange={(event) =>
-                        editorRef.current?.updateSelectedButton({
-                          text: event.target.value,
-                        })
+                        runEditorAction((editor) =>
+                          editor.updateSelectedButton({
+                            text: event.target.value,
+                          }),
+                        )
                       }
                     />
                   </label>
@@ -604,9 +672,11 @@ export function ReactEmailComposer({
                       className="h-9 bg-background"
                       placeholder="https://example.com"
                       onChange={(event) =>
-                        editorRef.current?.updateSelectedButton({
-                          href: event.target.value,
-                        })
+                        runEditorAction((editor) =>
+                          editor.updateSelectedButton({
+                            href: event.target.value,
+                          }),
+                        )
                       }
                     />
                   </label>
@@ -706,7 +776,9 @@ export function ReactEmailComposer({
                       aria-label={`Position button ${alignment}`}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() =>
-                        editorRef.current?.updateSelectedButton({ alignment })
+                        runEditorAction((editor) =>
+                          editor.updateSelectedButton({ alignment }),
+                        )
                       }
                     >
                       <Icon className="h-4 w-4" />
@@ -720,7 +792,9 @@ export function ReactEmailComposer({
                     disabled={disabled}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
-                      editorRef.current?.deleteSelectedButton();
+                      runEditorAction((editor) =>
+                        editor.deleteSelectedButton(),
+                      );
                       setSelectedButton(null);
                     }}
                   >

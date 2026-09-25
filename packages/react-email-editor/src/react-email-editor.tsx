@@ -221,6 +221,12 @@ function toPublicRef(
     const node = editor.state.doc.nodeAt(position);
     return node?.type.name === "button" ? { node, pos: position } : null;
   };
+  const getBlockInsertionPosition = (editor: EditorInstance) => {
+    const { selection } = editor.state;
+    return selection.$from.depth > 0
+      ? selection.$from.after(1)
+      : selection.to;
+  };
 
   return {
     getDocument: () => getRef()?.getJSON() ?? emptyDocument,
@@ -255,7 +261,7 @@ function toPublicRef(
       editor
         .chain()
         .focus()
-        .insertContent({
+        .insertContentAt(getBlockInsertionPosition(editor), {
           type: "button",
           content: [{ type: "text", text: "Button" }],
         })
@@ -268,7 +274,9 @@ function toPublicRef(
       editor
         .chain()
         .focus()
-        .insertContent({ type: "horizontalRule" })
+        .insertContentAt(getBlockInsertionPosition(editor), {
+          type: "horizontalRule",
+        })
         .run();
     },
     undo: () => {
@@ -406,7 +414,10 @@ function toPublicRef(
     setContent: (content) => {
       actionHistory.undo.length = 0;
       actionHistory.redo.length = 0;
-      getRef()?.editor?.commands.setContent(content);
+      const editor = getRef()?.editor;
+      if (!editor) return;
+      if (typeof content === "string") editor.commands.setContent(content);
+      else restoreDocument(editor, content);
     },
   };
 }
