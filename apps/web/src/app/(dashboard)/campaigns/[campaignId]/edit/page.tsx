@@ -420,7 +420,7 @@ function CampaignEditor({
             API.
           </p>
         ) : useModernEditor ? (
-          <div className="mx-auto w-full max-w-5xl rounded-lg bg-gray-50 p-4 sm:p-8">
+          <div className="mx-auto w-full max-w-7xl px-2 sm:px-4">
             <ReactEmailComposer
               content={campaign.content}
               html={campaign.html}
