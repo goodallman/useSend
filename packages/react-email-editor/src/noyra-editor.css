@@ -27,3 +27,8 @@
 .noyra-react-email-editor .align-right {
   text-align: right;
 }
+
+/* Match the browser defaults used by the generated email preview. */
+.noyra-react-email-editor hr {
+  margin: 0.5em 0;
+}

@@ -46,7 +46,7 @@ const starterDocument: ReactEmailDocument = {
       attrs: {
         href: "https://usesend.email",
         style:
-          "background-color: #111827; color: #ffffff; border-radius: 8px; padding: 12px 20px;",
+          "background-color: #111827; color: #ffffff; border-radius: 8px;",
       },
       content: [{ type: "text", text: "Explore useSend" }],
     },
