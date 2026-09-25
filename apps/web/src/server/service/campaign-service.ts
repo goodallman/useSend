@@ -1,4 +1,6 @@
 import { EmailRenderer } from "@usesend/email-editor/src/renderer";
+import { parseReactEmailContent } from "@usesend/react-email-editor/src/content-format";
+import { renderReactEmailDocument } from "@usesend/react-email-editor/src/server-renderer";
 import { db } from "../db";
 import { createHash } from "crypto";
 import { env } from "~/env";
@@ -69,11 +71,44 @@ function sanitizeAddressList(addresses?: string | string[]) {
     .filter((address) => address.length > 0);
 }
 
-async function prepareCampaignHtml(
+export function hasVisibleEmailBody(html: string | null | undefined) {
+  if (!html) return false;
+  const body = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? html;
+  return (
+    body
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<!--([\s\S]*?)-->/g, "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&(?:nbsp|zwnj|zwj|#8203);/gi, "")
+      .replace(/\s+/g, "")
+      .trim().length > 0
+  );
+}
+
+export async function prepareCampaignHtml(
   campaign: Campaign,
 ): Promise<{ campaign: Campaign; html: string }> {
   if (campaign.content) {
     try {
+      const reactEmailContent = parseReactEmailContent(campaign.content);
+      if (reactEmailContent) {
+        const html =
+          reactEmailContent.htmlOverride ??
+          (campaign.html && hasVisibleEmailBody(campaign.html)
+            ? campaign.html
+            : (await renderReactEmailDocument(reactEmailContent.document))
+                .html);
+
+        if (campaign.html !== html) {
+          campaign = await db.campaign.update({
+            where: { id: campaign.id },
+            data: { html },
+          });
+        }
+
+        return { campaign, html };
+      }
+
       const jsonContent = JSON.parse(campaign.content);
       const renderer = new EmailRenderer(jsonContent);
       const html = await renderer.render();
@@ -112,6 +147,18 @@ async function renderCampaignHtmlForContact({
 }) {
   if (campaign.content) {
     try {
+      if (parseReactEmailContent(campaign.content)) {
+        if (!campaign.html) {
+          throw new Error("No rendered HTML for React Email campaign");
+        }
+        let html = replaceUnsubscribePlaceholders(
+          campaign.html,
+          unsubscribeUrl,
+        );
+        html = replaceContactVariables(html, contact, allowedVariables);
+        return html;
+      }
+
       const jsonContent = JSON.parse(campaign.content);
       const renderer = new EmailRenderer(jsonContent);
       const linkValues: Record<string, string> = {};
@@ -1073,7 +1120,7 @@ export class CampaignBatchService {
     createWorkerHandler(async (job: CampaignBatchJob) => {
       const { campaignId } = job.data;
 
-      const campaign = await db.campaign.findUnique({
+      let campaign = await db.campaign.findUnique({
         where: { id: campaignId },
       });
       if (!campaign) return;
@@ -1085,6 +1132,9 @@ export class CampaignBatchService {
       // Respect scheduledAt if set
       if (campaign.scheduledAt && campaign.scheduledAt.getTime() > Date.now())
         return;
+
+      campaign = (await prepareCampaignHtml(campaign)).campaign;
+      if (!campaign.contactBookId) return;
 
       // First touch moves SCHEDULED -> RUNNING
       if (campaign.status === "SCHEDULED") {
@@ -1249,7 +1299,7 @@ export class CampaignBatchService {
     await this.batchQueue.add(
       `campaign-${campaignId}`,
       { campaignId, teamId },
-      { jobId: `campaign-batch:${campaignId}`, ...DEFAULT_QUEUE_OPTIONS },
+      { jobId: `campaign-batch-${campaignId}`, ...DEFAULT_QUEUE_OPTIONS },
     );
   }
 }

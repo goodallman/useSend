@@ -187,7 +187,7 @@ export const campaignRouter = createTRPCRouter({
   ),
 
   getCampaign: campaignProcedure.query(async ({ ctx: { db, team }, input }) => {
-    const campaign = await db.campaign.findUnique({
+    let campaign = await db.campaign.findUnique({
       where: { id: input.campaignId, teamId: team.id },
     });
 
@@ -196,6 +196,13 @@ export const campaignRouter = createTRPCRouter({
         code: "BAD_REQUEST",
         message: "Campaign not found",
       });
+    }
+
+    if (
+      parseReactEmailContent(campaign.content) &&
+      !campaignService.hasVisibleEmailBody(campaign.html)
+    ) {
+      campaign = (await campaignService.prepareCampaignHtml(campaign)).campaign;
     }
 
     const imageUploadSupported = isStorageConfigured();

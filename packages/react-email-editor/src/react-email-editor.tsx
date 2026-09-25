@@ -54,8 +54,7 @@ export const DEFAULT_REACT_EMAIL_DOCUMENT: ReactEmailDocument = {
       type: "button",
       attrs: {
         href: "https://example.com",
-        style:
-          "background-color: #111827; color: #ffffff; border-radius: 8px;",
+        style: "background-color: #111827; color: #ffffff; border-radius: 8px;",
       },
       content: [{ type: "text", text: "Call to action" }],
     },
@@ -216,10 +215,14 @@ function toPublicRef(
     return node?.type.name === "button" ? { node, pos: position } : null;
   };
   const getBlockInsertionPosition = (editor: EditorInstance) => {
+    const savedSelection = getTextSelection();
     const { selection } = editor.state;
-    return selection.$from.depth > 0
-      ? selection.$from.after(1)
-      : selection.to;
+    const $from = savedSelection
+      ? editor.state.doc.resolve(savedSelection.from)
+      : selection.$from;
+    return $from.depth > 0
+      ? $from.after(1)
+      : (savedSelection?.to ?? selection.to);
   };
 
   return {
@@ -234,15 +237,13 @@ function toPublicRef(
       const editor = getRef()?.editor;
       if (!editor) return;
       recordAction(editor);
-      editor.chain().focus().insertContent(value).run();
+      restoreTextSelection(editor).insertContent(value).run();
     },
     insertUnsubscribe: () => {
       const editor = getRef()?.editor;
       if (!editor) return;
       recordAction(editor);
-      editor
-        .chain()
-        .focus()
+      restoreTextSelection(editor)
         .insertContent(
           '<p style="text-align: center; color: #6b7280; font-size: 12px"><a href="{{usesend_unsubscribe_url}}">Unsubscribe</a></p>',
         )
@@ -252,10 +253,11 @@ function toPublicRef(
       const editor = getRef()?.editor;
       if (!editor) return;
       recordAction(editor);
+      const position = getBlockInsertionPosition(editor);
       editor
         .chain()
         .focus()
-        .insertContentAt(getBlockInsertionPosition(editor), {
+        .insertContentAt(position, {
           type: "button",
           content: [{ type: "text", text: "Button" }],
         })
@@ -265,10 +267,11 @@ function toPublicRef(
       const editor = getRef()?.editor;
       if (!editor) return;
       recordAction(editor);
+      const position = getBlockInsertionPosition(editor);
       editor
         .chain()
         .focus()
-        .insertContentAt(getBlockInsertionPosition(editor), {
+        .insertContentAt(position, {
           type: "horizontalRule",
         })
         .run();
@@ -458,77 +461,75 @@ export const ReactEmailEditor = forwardRef<
     [],
   );
 
-  const handleReady = useCallback(
-    (ref: BaseEmailEditorRef) => {
-      editorRef.current = ref;
-      selectionCleanupRef.current?.();
-      const notifySelection = () => {
-        if (!ref.editor) return;
-        const state = getEditorState(ref.editor);
-        if (state.hasTextSelection && !state.button) {
-          textSelectionRef.current = {
-            from: ref.editor.state.selection.from,
-            to: ref.editor.state.selection.to,
-          };
-        }
-        const activeButton = findActiveButton(ref.editor);
-        if (activeButton) buttonPositionRef.current = activeButton.pos;
-        onSelectionChangeRef.current?.(state);
-      };
-      ref.editor?.on("selectionUpdate", notifySelection);
-      ref.editor?.on("update", notifySelection);
-      const editorElement = ref.editor?.view.dom;
-      const selectClickedButton = (event: Event) => {
-        const target = event.target;
-        if (!(target instanceof Element)) return;
-        const button = target.closest(".node-button");
-        if (!button || !ref.editor) return;
+  const handleReady = useCallback((ref: BaseEmailEditorRef) => {
+    editorRef.current = ref;
+    selectionCleanupRef.current?.();
+    const notifySelection = () => {
+      if (!ref.editor) return;
+      const state = getEditorState(ref.editor);
+      const selection = ref.editor.state.selection;
+      if (!state.button && !("node" in selection)) {
+        textSelectionRef.current = {
+          from: selection.from,
+          to: selection.to,
+        };
+      }
+      const activeButton = findActiveButton(ref.editor);
+      if (activeButton) buttonPositionRef.current = activeButton.pos;
+      onSelectionChangeRef.current?.(state);
+    };
+    ref.editor?.on("selectionUpdate", notifySelection);
+    ref.editor?.on("update", notifySelection);
+    const editorElement = ref.editor?.view.dom;
+    const selectClickedButton = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest(".node-button");
+      if (!button || !ref.editor) return;
 
-        const buttonIndex = editorElement
-          ? Array.from(editorElement.querySelectorAll(".node-button")).indexOf(
-              button,
-            )
-          : -1;
-        const buttonPositions: number[] = [];
-        ref.editor.state.doc.descendants((node, position) => {
-          if (node.type.name === "button") buttonPositions.push(position);
-        });
-        const buttonPosition = buttonPositions[buttonIndex];
-        if (buttonPosition === undefined) return;
+      const buttonIndex = editorElement
+        ? Array.from(editorElement.querySelectorAll(".node-button")).indexOf(
+            button,
+          )
+        : -1;
+      const buttonPositions: number[] = [];
+      ref.editor.state.doc.descendants((node, position) => {
+        if (node.type.name === "button") buttonPositions.push(position);
+      });
+      const buttonPosition = buttonPositions[buttonIndex];
+      if (buttonPosition === undefined) return;
 
-        event.preventDefault();
-        ref.editor.chain().focus().setNodeSelection(buttonPosition).run();
-      };
-      editorElement?.addEventListener("pointerdown", selectClickedButton, true);
-      editorElement?.addEventListener("mousedown", selectClickedButton, true);
-      editorElement?.addEventListener("click", selectClickedButton, true);
-      selectionCleanupRef.current = () => {
-        ref.editor?.off("selectionUpdate", notifySelection);
-        ref.editor?.off("update", notifySelection);
-        editorElement?.removeEventListener(
-          "pointerdown",
-          selectClickedButton,
-          true,
-        );
-        editorElement?.removeEventListener(
-          "mousedown",
-          selectClickedButton,
-          true,
-        );
-        editorElement?.removeEventListener("click", selectClickedButton, true);
-      };
-      notifySelection();
-      onReadyRef.current?.(
-        toPublicRef(
-          () => ref,
-          () => textSelectionRef.current,
-          () => buttonPositionRef.current,
-          actionHistoryRef.current,
-        ),
+      event.preventDefault();
+      ref.editor.chain().focus().setNodeSelection(buttonPosition).run();
+    };
+    editorElement?.addEventListener("pointerdown", selectClickedButton, true);
+    editorElement?.addEventListener("mousedown", selectClickedButton, true);
+    editorElement?.addEventListener("click", selectClickedButton, true);
+    selectionCleanupRef.current = () => {
+      ref.editor?.off("selectionUpdate", notifySelection);
+      ref.editor?.off("update", notifySelection);
+      editorElement?.removeEventListener(
+        "pointerdown",
+        selectClickedButton,
+        true,
       );
-    },
-    [],
-  );
+      editorElement?.removeEventListener(
+        "mousedown",
+        selectClickedButton,
+        true,
+      );
+      editorElement?.removeEventListener("click", selectClickedButton, true);
+    };
+    notifySelection();
+    onReadyRef.current?.(
+      toPublicRef(
+        () => ref,
+        () => textSelectionRef.current,
+        () => buttonPositionRef.current,
+        actionHistoryRef.current,
+      ),
+    );
+  }, []);
 
   const handleUpdate = useCallback((ref: BaseEmailEditorRef) => {
     editorRef.current = ref;

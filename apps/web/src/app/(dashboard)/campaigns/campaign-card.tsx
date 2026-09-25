@@ -33,8 +33,6 @@ interface CampaignCardProps {
 }
 
 export default function CampaignCard({ campaign }: CampaignCardProps) {
-  const sentPercentage =
-    campaign.total > 0 ? Math.round((campaign.sent / campaign.total) * 100) : 0;
   const pendingCount = campaign.total - campaign.sent;
 
   return (
@@ -44,8 +42,7 @@ export default function CampaignCard({ campaign }: CampaignCardProps) {
         <div className="w-1/3">
           <Link
             href={
-              campaign.status === CampaignStatus.DRAFT ||
-              campaign.status === CampaignStatus.SCHEDULED
+              campaign.status === CampaignStatus.DRAFT
                 ? `/campaigns/${campaign.id}/edit`
                 : `/campaigns/${campaign.id}`
             }
