@@ -152,10 +152,19 @@ export function ReactEmailComposer({
   const [editorState, setEditorState] =
     useState<ReactEmailEditorState>(initialEditorState);
   const [linkDraft, setLinkDraft] = useState("");
+  const [linkPanelOpen, setLinkPanelOpen] = useState(false);
+  const linkPanelInteractingRef = useRef(false);
 
   useEffect(() => {
     setLinkDraft(editorState.linkHref);
   }, [editorState.hasTextSelection, editorState.linkHref]);
+
+  const handleEditorSelectionChange = (next: ReactEmailEditorState) => {
+    setEditorState(next);
+    if (next.button) setLinkPanelOpen(false);
+    else if (next.hasTextSelection) setLinkPanelOpen(true);
+    else if (!linkPanelInteractingRef.current) setLinkPanelOpen(false);
+  };
 
   const updateButtonStyle = (changes: Record<string, string>) => {
     if (!editorState.button) return;
@@ -470,8 +479,21 @@ export function ReactEmailComposer({
               </Button>
             </div>
 
-            {editorState.hasTextSelection && !editorState.button ? (
-              <div className="flex flex-wrap items-end gap-2 border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4">
+            {linkPanelOpen && !editorState.button ? (
+              <div
+                className="flex flex-wrap items-end gap-2 border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4"
+                onPointerDownCapture={() => {
+                  linkPanelInteractingRef.current = true;
+                }}
+                onFocusCapture={() => {
+                  linkPanelInteractingRef.current = true;
+                }}
+                onBlurCapture={() => {
+                  window.setTimeout(() => {
+                    linkPanelInteractingRef.current = false;
+                  });
+                }}
+              >
                 <label className="min-w-[220px] flex-1 space-y-1 text-xs font-medium">
                   <span>Link for selected text</span>
                   <Input
@@ -484,6 +506,7 @@ export function ReactEmailComposer({
                       if (event.key === "Enter") {
                         event.preventDefault();
                         editorRef.current?.updateSelectedLink(linkDraft);
+                        setLinkPanelOpen(false);
                       }
                     }}
                   />
@@ -494,9 +517,10 @@ export function ReactEmailComposer({
                   className="h-9"
                   disabled={disabled || !linkDraft.trim()}
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() =>
-                    editorRef.current?.updateSelectedLink(linkDraft)
-                  }
+                  onClick={() => {
+                    editorRef.current?.updateSelectedLink(linkDraft);
+                    setLinkPanelOpen(false);
+                  }}
                 >
                   <Link2 className="mr-1.5 h-4 w-4" /> Apply link
                 </Button>
@@ -508,7 +532,10 @@ export function ReactEmailComposer({
                     className="h-9"
                     disabled={disabled}
                     onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => editorRef.current?.updateSelectedLink("")}
+                    onClick={() => {
+                      editorRef.current?.updateSelectedLink("");
+                      setLinkPanelOpen(false);
+                    }}
                   >
                     Remove
                   </Button>
@@ -684,7 +711,7 @@ export function ReactEmailComposer({
                 content={initialDocument}
                 editable={!disabled}
                 onDocumentChange={handleDocumentChange}
-                onSelectionChange={setEditorState}
+                onSelectionChange={handleEditorSelectionChange}
                 onReady={() => {
                   if (!html) void refreshOutput();
                 }}

@@ -120,6 +120,7 @@ export interface ReactEmailEditorProps extends Omit<
 const emptyDocument: ReactEmailDocument = { type: "doc", content: [] };
 
 type EditorInstance = NonNullable<BaseEmailEditorRef["editor"]>;
+type TextSelectionRange = { from: number; to: number };
 type EditorNode = NonNullable<
   ReturnType<EditorInstance["state"]["doc"]["nodeAt"]>
 >;
@@ -182,7 +183,15 @@ function getEditorState(editor: EditorInstance): ReactEmailEditorState {
 
 function toPublicRef(
   getRef: () => BaseEmailEditorRef | null,
+  getTextSelection: () => TextSelectionRange | null,
 ): ReactEmailEditorRef {
+  const restoreTextSelection = (editor: EditorInstance) => {
+    const selection = getTextSelection();
+    return selection
+      ? editor.chain().focus().setTextSelection(selection)
+      : editor.chain().focus();
+  };
+
   return {
     getDocument: () => getRef()?.getJSON() ?? emptyDocument,
     getEmail: async () => getRef()?.getEmail() ?? { html: "", text: "" },
@@ -234,31 +243,37 @@ function toPublicRef(
       const editor = getRef()?.editor;
       if (!editor) return;
       if (type === "paragraph") {
-        editor.chain().focus().clearNodes().setNode("paragraph").run();
+        restoreTextSelection(editor).clearNodes().setNode("paragraph").run();
         return;
       }
       const level = Number(type.slice(-1)) as 1 | 2 | 3;
-      editor.chain().focus().clearNodes().setNode("heading", { level }).run();
+      restoreTextSelection(editor)
+        .clearNodes()
+        .setNode("heading", { level })
+        .run();
     },
     setTextAlignment: (alignment) => {
       const editor = getRef()?.editor;
-      if (editor) setTextAlignment(editor, alignment);
+      if (!editor) return;
+      restoreTextSelection(editor).run();
+      setTextAlignment(editor, alignment);
     },
     toggleMark: (mark) => {
       const editor = getRef()?.editor;
       if (!editor) return;
-      editor.chain().focus().toggleMark(mark).run();
+      restoreTextSelection(editor).toggleMark(mark).run();
     },
     updateSelectedLink: (href) => {
       const editor = getRef()?.editor;
       if (!editor) return;
       if (!href.trim()) {
-        editor.chain().focus().extendMarkRange("link").unsetMark("link").run();
+        restoreTextSelection(editor)
+          .extendMarkRange("link")
+          .unsetMark("link")
+          .run();
         return;
       }
-      editor
-        .chain()
-        .focus()
+      restoreTextSelection(editor)
         .extendMarkRange("link")
         .setMark("link", { href: href.trim() })
         .run();
@@ -330,6 +345,7 @@ export const ReactEmailEditor = forwardRef<
   forwardedRef,
 ) {
   const editorRef = useRef<BaseEmailEditorRef>(null);
+  const textSelectionRef = useRef<TextSelectionRange | null>(null);
   const selectionCleanupRef = useRef<(() => void) | null>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
@@ -338,7 +354,11 @@ export const ReactEmailEditor = forwardRef<
 
   useImperativeHandle(
     forwardedRef,
-    () => toPublicRef(() => editorRef.current),
+    () =>
+      toPublicRef(
+        () => editorRef.current,
+        () => textSelectionRef.current,
+      ),
     [],
   );
 
@@ -347,8 +367,15 @@ export const ReactEmailEditor = forwardRef<
       editorRef.current = ref;
       selectionCleanupRef.current?.();
       const notifySelection = () => {
-        if (ref.editor)
-          onSelectionChangeRef.current?.(getEditorState(ref.editor));
+        if (!ref.editor) return;
+        const state = getEditorState(ref.editor);
+        if (state.hasTextSelection && !state.button) {
+          textSelectionRef.current = {
+            from: ref.editor.state.selection.from,
+            to: ref.editor.state.selection.to,
+          };
+        }
+        onSelectionChangeRef.current?.(state);
       };
       ref.editor?.on("selectionUpdate", notifySelection);
       ref.editor?.on("transaction", notifySelection);
@@ -357,7 +384,12 @@ export const ReactEmailEditor = forwardRef<
         ref.editor?.off("transaction", notifySelection);
       };
       notifySelection();
-      onReady?.(toPublicRef(() => ref));
+      onReady?.(
+        toPublicRef(
+          () => ref,
+          () => textSelectionRef.current,
+        ),
+      );
     },
     [onReady],
   );
