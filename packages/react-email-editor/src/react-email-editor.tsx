@@ -386,12 +386,16 @@ export const ReactEmailEditor = forwardRef<
         const button = target.closest(".node-button");
         if (!button || !ref.editor) return;
 
-        const contentPosition = ref.editor.view.posAtDOM(button, 0);
-        const buttonPosition = [contentPosition - 1, contentPosition].find(
-          (position) =>
-            position >= 0 &&
-            ref.editor?.state.doc.nodeAt(position)?.type.name === "button",
-        );
+        const buttonIndex = editorElement
+          ? Array.from(editorElement.querySelectorAll(".node-button")).indexOf(
+              button,
+            )
+          : -1;
+        const buttonPositions: number[] = [];
+        ref.editor.state.doc.descendants((node, position) => {
+          if (node.type.name === "button") buttonPositions.push(position);
+        });
+        const buttonPosition = buttonPositions[buttonIndex];
         if (buttonPosition === undefined) return;
 
         event.preventDefault();
