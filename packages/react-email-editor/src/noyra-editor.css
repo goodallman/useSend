@@ -13,3 +13,17 @@
 .noyra-react-email-editor > div[tabindex="0"]:has([data-re-img-bm-item]) {
   display: none !important;
 }
+
+/* The button node emits an alignment class on its full-width wrapper, but the
+ * upstream theme does not provide styles for those classes in the editor. */
+.noyra-react-email-editor .align-left {
+  text-align: left;
+}
+
+.noyra-react-email-editor .align-center {
+  text-align: center;
+}
+
+.noyra-react-email-editor .align-right {
+  text-align: right;
+}
