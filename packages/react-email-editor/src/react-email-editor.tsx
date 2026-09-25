@@ -24,6 +24,11 @@ export type ReactEmailDocument = ReturnType<BaseEmailEditorRef["getJSON"]>;
 export type ReactEmailBlockType =
   "paragraph" | "heading1" | "heading2" | "heading3";
 
+const DEFAULT_BUBBLE_MENU: NonNullable<BaseEmailEditorProps["bubbleMenu"]> = {
+  hideWhenActiveNodes: ["button", "horizontalRule"],
+  hideWhenActiveMarks: ["link"],
+};
+
 export const DEFAULT_REACT_EMAIL_DOCUMENT: ReactEmailDocument = {
   type: "doc",
   content: [
@@ -414,7 +419,14 @@ export const ReactEmailEditor = forwardRef<
   ReactEmailEditorRef,
   ReactEmailEditorProps
 >(function ReactEmailEditor(
-  { className, onDocumentChange, onReady, onSelectionChange, ...props },
+  {
+    bubbleMenu,
+    className,
+    onDocumentChange,
+    onReady,
+    onSelectionChange,
+    ...props
+  },
   forwardedRef,
 ) {
   const editorRef = useRef<BaseEmailEditorRef>(null);
@@ -425,7 +437,11 @@ export const ReactEmailEditor = forwardRef<
     redo: [],
   });
   const selectionCleanupRef = useRef<(() => void) | null>(null);
+  const onDocumentChangeRef = useRef(onDocumentChange);
+  const onReadyRef = useRef(onReady);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  onDocumentChangeRef.current = onDocumentChange;
+  onReadyRef.current = onReady;
   onSelectionChangeRef.current = onSelectionChange;
 
   useEffect(() => () => selectionCleanupRef.current?.(), []);
@@ -460,7 +476,7 @@ export const ReactEmailEditor = forwardRef<
         onSelectionChangeRef.current?.(state);
       };
       ref.editor?.on("selectionUpdate", notifySelection);
-      ref.editor?.on("transaction", notifySelection);
+      ref.editor?.on("update", notifySelection);
       const editorElement = ref.editor?.view.dom;
       const selectClickedButton = (event: Event) => {
         const target = event.target;
@@ -488,7 +504,7 @@ export const ReactEmailEditor = forwardRef<
       editorElement?.addEventListener("click", selectClickedButton, true);
       selectionCleanupRef.current = () => {
         ref.editor?.off("selectionUpdate", notifySelection);
-        ref.editor?.off("transaction", notifySelection);
+        ref.editor?.off("update", notifySelection);
         editorElement?.removeEventListener(
           "pointerdown",
           selectClickedButton,
@@ -502,7 +518,7 @@ export const ReactEmailEditor = forwardRef<
         editorElement?.removeEventListener("click", selectClickedButton, true);
       };
       notifySelection();
-      onReady?.(
+      onReadyRef.current?.(
         toPublicRef(
           () => ref,
           () => textSelectionRef.current,
@@ -511,21 +527,19 @@ export const ReactEmailEditor = forwardRef<
         ),
       );
     },
-    [onReady],
+    [],
   );
 
-  const handleUpdate = useCallback(
-    (ref: BaseEmailEditorRef) => {
-      editorRef.current = ref;
-      onDocumentChange?.(ref.getJSON());
-    },
-    [onDocumentChange],
-  );
+  const handleUpdate = useCallback((ref: BaseEmailEditorRef) => {
+    editorRef.current = ref;
+    onDocumentChangeRef.current?.(ref.getJSON());
+  }, []);
 
   return (
     <BaseEmailEditor
       {...props}
       ref={editorRef}
+      bubbleMenu={bubbleMenu ?? DEFAULT_BUBBLE_MENU}
       className={`noyra-react-email-editor ${className ?? ""}`}
       onReady={handleReady}
       onUpdate={handleUpdate}

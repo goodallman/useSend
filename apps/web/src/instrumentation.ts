@@ -1,4 +1,3 @@
-import { initDomainVerificationJob } from "~/server/jobs/domain-verification-job";
 import { isCloud, isEmailCleanupEnabled } from "~/utils/common";
 
 let initialized = false;
@@ -9,6 +8,14 @@ let initialized = false;
  * more details here: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 export async function register() {
+  if (
+    process.env.NODE_ENV === "development" &&
+    process.env.EDITOR_LAB_ONLY === "true"
+  ) {
+    console.log("Skipping runtime services for the local UI-only preview");
+    return;
+  }
+
   // eslint-disable-next-line turbo/no-undeclared-env-vars
   if (process.env.NEXT_RUNTIME === "nodejs" && !initialized) {
     console.log("Registering instrumentation");
@@ -26,6 +33,9 @@ export async function register() {
     }
 
     if (process.env.REDIS_URL) {
+      const { initDomainVerificationJob } = await import(
+        "~/server/jobs/domain-verification-job"
+      );
       await initDomainVerificationJob();
     }
 

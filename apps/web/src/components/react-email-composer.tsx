@@ -145,6 +145,8 @@ export function ReactEmailComposer({
   const initialDocument =
     parsedContent?.document ?? DEFAULT_REACT_EMAIL_DOCUMENT;
   const [document, setDocument] = useState<ReactEmailDocument>(initialDocument);
+  const [editorContent, setEditorContent] =
+    useState<ReactEmailDocument>(initialDocument);
   const [editorRevision, setEditorRevision] = useState(0);
   const [html, setHtml] = useState(
     parsedContent?.htmlOverride ?? initialHtml ?? "",
@@ -189,6 +191,7 @@ export function ReactEmailComposer({
     editorHistoryRef.current.redo.push(editor.getDocument());
     editor.setContent(previous);
     setDocument(previous);
+    setEditorContent(previous);
     setSelectedButton(null);
     setLinkPanelOpen(false);
     setEditorRevision((revision) => revision + 1);
@@ -205,6 +208,7 @@ export function ReactEmailComposer({
     editorHistoryRef.current.undo.push(editor.getDocument());
     editor.setContent(next);
     setDocument(next);
+    setEditorContent(next);
     setSelectedButton(null);
     setLinkPanelOpen(false);
     setEditorRevision((revision) => revision + 1);
@@ -634,27 +638,24 @@ export function ReactEmailComposer({
               <div
                 className="border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[680px] lg:border-b-0 lg:border-l lg:p-5"
               >
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div>
+                <div className="mb-2">
+                  <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-medium">Button settings</p>
-                    <p className="text-xs text-muted-foreground">
-                      Edit the selected button without covering the email.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="rounded-full bg-blue-100 px-2 py-1 text-[11px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                      Selected
-                    </span>
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="h-8 w-8 px-0"
+                      className="-mr-2 h-8 w-8 shrink-0 px-0"
                       aria-label="Close button settings"
                       onClick={() => setSelectedButton(null)}
                     >
                       <X className="h-4 w-4" />
                     </Button>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Edit the selected button without covering the email.
+                    </p>
                   </div>
                 </div>
                 <div className="grid gap-3">
@@ -762,7 +763,7 @@ export function ReactEmailComposer({
                     </label>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="text-xs font-medium">Position</span>
                   {(
                     [
@@ -797,7 +798,7 @@ export function ReactEmailComposer({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="ml-auto h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    className="mt-1 h-8 w-full justify-start px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     disabled={disabled}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
@@ -840,7 +841,7 @@ export function ReactEmailComposer({
               <ReactEmailEditor
                 key={editorRevision}
                 ref={editorRef}
-                content={document}
+                content={editorContent}
                 editable={!disabled}
                 onDocumentChange={handleDocumentChange}
                 onSelectionChange={handleEditorSelectionChange}
