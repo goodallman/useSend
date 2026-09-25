@@ -124,7 +124,6 @@ type TextSelectionRange = { from: number; to: number };
 type EditorActionHistory = {
   undo: ReactEmailDocument[];
   redo: ReactEmailDocument[];
-  applying: boolean;
 };
 type EditorNode = NonNullable<
   ReturnType<EditorInstance["state"]["doc"]["nodeAt"]>
@@ -192,17 +191,10 @@ function toPublicRef(
   getButtonPosition: () => number | null,
   actionHistory: EditorActionHistory,
 ): ReactEmailEditorRef {
-  const markActionUpdate = () => {
-    actionHistory.applying = true;
-    queueMicrotask(() => {
-      actionHistory.applying = false;
-    });
-  };
   const recordAction = (editor: EditorInstance) => {
     actionHistory.undo.push(editor.getJSON());
     if (actionHistory.undo.length > 100) actionHistory.undo.shift();
     actionHistory.redo.length = 0;
-    markActionUpdate();
   };
   const restoreTextSelection = (editor: EditorInstance) => {
     const selection = getTextSelection();
@@ -274,7 +266,6 @@ function toPublicRef(
       const previous = actionHistory.undo.pop();
       if (previous) {
         actionHistory.redo.push(editor.getJSON());
-        markActionUpdate();
         editor.commands.setContent(previous);
         return;
       }
@@ -292,7 +283,6 @@ function toPublicRef(
       const next = actionHistory.redo.pop();
       if (next) {
         actionHistory.undo.push(editor.getJSON());
-        markActionUpdate();
         editor.commands.setContent(next);
         return;
       }
@@ -423,7 +413,6 @@ export const ReactEmailEditor = forwardRef<
   const actionHistoryRef = useRef<EditorActionHistory>({
     undo: [],
     redo: [],
-    applying: false,
   });
   const selectionCleanupRef = useRef<(() => void) | null>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -518,10 +507,6 @@ export const ReactEmailEditor = forwardRef<
   const handleUpdate = useCallback(
     (ref: BaseEmailEditorRef) => {
       editorRef.current = ref;
-      if (!actionHistoryRef.current.applying) {
-        actionHistoryRef.current.undo.length = 0;
-        actionHistoryRef.current.redo.length = 0;
-      }
       onDocumentChange?.(ref.getJSON());
     },
     [onDocumentChange],
