@@ -121,7 +121,7 @@ function TemplateEditor({
   };
 
   return (
-    <div className="p-4 container mx-auto">
+    <div className="mx-auto w-full max-w-none p-4">
       <div className="mx-auto">
         <div className="mb-4 flex justify-between items-center w-full sm:w-[700px] mx-auto">
           <div className="flex items-center gap-3">
@@ -201,7 +201,7 @@ function TemplateEditor({
         </div>
 
         {useModernEditor ? (
-          <div className="mx-auto w-full max-w-7xl px-2 sm:px-4">
+          <div className="mx-auto w-full max-w-[90rem] px-2 sm:px-4">
             <ReactEmailComposer
               content={template.content}
               html={template.html}
