@@ -241,12 +241,24 @@ function toPublicRef(
     undo: () => {
       const editor = getRef()?.editor;
       if (!editor) return;
-      (editor.commands as unknown as { undo: () => boolean }).undo();
+      (
+        editor.chain().focus() as unknown as {
+          undo: () => { run: () => boolean };
+        }
+      )
+        .undo()
+        .run();
     },
     redo: () => {
       const editor = getRef()?.editor;
       if (!editor) return;
-      (editor.commands as unknown as { redo: () => boolean }).redo();
+      (
+        editor.chain().focus() as unknown as {
+          redo: () => { run: () => boolean };
+        }
+      )
+        .redo()
+        .run();
     },
     setBlockType: (type) => {
       const editor = getRef()?.editor;
