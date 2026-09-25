@@ -288,8 +288,38 @@ export function ReactEmailComposer({
     }
   };
 
+  const applyHtmlToDesign = () => {
+    const editor = editorRef.current;
+    if (!editor || !sourceIsCustom) return;
+
+    const previous = editor.getDocument();
+    editorHistoryRef.current.undo.push(previous);
+    if (editorHistoryRef.current.undo.length > 100) {
+      editorHistoryRef.current.undo.shift();
+    }
+    editorHistoryRef.current.redo.length = 0;
+
+    editor.setContent(html);
+    const next = editor.getDocument();
+    setDocument(next);
+    setEditorContent(next);
+    setSelectedButton(null);
+    setLinkPanelOpen(false);
+    setSourceIsCustom(false);
+  };
+
   const changeMode = (value: string) => {
     const nextMode = value as EditorMode;
+
+    if (nextMode === "html" && mode === "visual" && !sourceIsCustom) {
+      saveVisual.cancel();
+      void refreshOutput();
+    }
+
+    if (nextMode === "visual" && sourceIsCustom) {
+      applyHtmlToDesign();
+    }
+
     setMode(nextMode);
     if (nextMode === "preview" && mode !== "html" && !sourceIsCustom) {
       void refreshOutput();
@@ -834,7 +864,10 @@ export function ReactEmailComposer({
 
         <TabsContent
           value="visual"
-          className="m-0 min-w-0 lg:col-start-1 lg:row-start-3"
+          forceMount
+          className={`m-0 min-w-0 lg:col-start-1 lg:row-start-3 ${
+            mode === "visual" ? "" : "hidden"
+          }`}
         >
           <div className="bg-slate-100 p-3 dark:bg-slate-950/50 sm:p-6 lg:py-10 lg:pl-10 lg:pr-0">
             <div className="mx-auto min-h-[600px] w-full max-w-[680px] overflow-visible bg-white shadow-[0_12px_40px_rgba(15,23,42,0.10)] ring-1 ring-slate-200">
@@ -874,12 +907,18 @@ export function ReactEmailComposer({
                 value={html}
                 readOnly={disabled}
                 onChange={(event) => {
+                  saveVisual.cancel();
                   setHtml(event.target.value);
                   setSourceIsCustom(true);
                 }}
                 className="min-h-[560px] resize-y rounded-none border-0 p-5 font-mono text-xs focus-visible:ring-0"
                 spellCheck={false}
               />
+              <p className="border-t px-4 py-2 text-xs text-muted-foreground">
+                Switching back to Design imports the current HTML. Unsupported
+                email-specific structures may be simplified by the visual
+                editor.
+              </p>
             </div>
           </div>
         </TabsContent>
