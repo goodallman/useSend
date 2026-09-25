@@ -253,7 +253,7 @@ export function ReactEmailComposer({
                     ? async (file) => ({ url: await uploadImage(file) })
                     : undefined
                 }
-                className="min-h-[600px] px-6 py-10 text-slate-950 sm:px-12 sm:py-14 [&_.tiptap]:mx-auto [&_.tiptap]:w-full [&_.tiptap]:max-w-[584px] [&_.tiptap]:outline-none"
+                className="min-h-[600px] w-full max-w-full overflow-hidden px-6 py-10 text-slate-950 sm:px-12 sm:py-14 [&_.node-container]:!w-full [&_.node-container]:!max-w-full [&_.tiptap]:mx-auto [&_.tiptap]:w-full [&_.tiptap]:max-w-[584px] [&_.tiptap]:break-words [&_.tiptap]:outline-none"
               />
             </div>
           </div>
