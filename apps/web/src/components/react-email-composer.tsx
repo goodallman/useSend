@@ -380,6 +380,7 @@ export function ReactEmailComposer({
                   aria-label={label}
                   aria-pressed={editorState.marks[mark]}
                   title={label}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => editorRef.current?.toggleMark(mark)}
                 >
                   <Icon className="h-4 w-4" />
@@ -407,6 +408,7 @@ export function ReactEmailComposer({
                   aria-label={label}
                   aria-pressed={editorState.alignment === alignment}
                   title={label}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => editorRef.current?.setTextAlignment(alignment)}
                 >
                   <Icon className="h-4 w-4" />
@@ -423,6 +425,7 @@ export function ReactEmailComposer({
                 disabled={disabled}
                 aria-label="Undo"
                 title="Undo"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editorRef.current?.undo()}
               >
                 <Undo2 className="h-4 w-4" />
@@ -435,6 +438,7 @@ export function ReactEmailComposer({
                 disabled={disabled}
                 aria-label="Redo"
                 title="Redo"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editorRef.current?.redo()}
               >
                 <Redo2 className="h-4 w-4" />
@@ -448,6 +452,7 @@ export function ReactEmailComposer({
                 variant="ghost"
                 className="h-8"
                 disabled={disabled}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editorRef.current?.insertButton()}
               >
                 <Plus className="mr-1.5 h-4 w-4" /> Button
@@ -458,6 +463,7 @@ export function ReactEmailComposer({
                 variant="ghost"
                 className="h-8"
                 disabled={disabled}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editorRef.current?.insertDivider()}
               >
                 <Minus className="mr-1.5 h-4 w-4" /> Divider
@@ -487,6 +493,7 @@ export function ReactEmailComposer({
                   size="sm"
                   className="h-9"
                   disabled={disabled || !linkDraft.trim()}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() =>
                     editorRef.current?.updateSelectedLink(linkDraft)
                   }
@@ -500,6 +507,7 @@ export function ReactEmailComposer({
                     variant="outline"
                     className="h-9"
                     disabled={disabled}
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => editorRef.current?.updateSelectedLink("")}
                   >
                     Remove
@@ -567,6 +575,7 @@ export function ReactEmailComposer({
                           className="h-7 min-w-8 px-2 text-xs"
                           disabled={disabled}
                           aria-label={`${label} button size`}
+                          onMouseDown={(event) => event.preventDefault()}
                           onClick={() =>
                             updateButtonStyle({
                               "padding-top": vertical,
@@ -642,6 +651,7 @@ export function ReactEmailComposer({
                       className="h-8 w-8 px-0"
                       disabled={disabled}
                       aria-label={`Position button ${alignment}`}
+                      onMouseDown={(event) => event.preventDefault()}
                       onClick={() =>
                         editorRef.current?.updateSelectedButton({ alignment })
                       }
@@ -655,6 +665,7 @@ export function ReactEmailComposer({
                     variant="ghost"
                     className="ml-auto h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     disabled={disabled}
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => editorRef.current?.deleteSelectedButton()}
                   >
                     <Trash2 className="mr-1.5 h-4 w-4" /> Delete button
