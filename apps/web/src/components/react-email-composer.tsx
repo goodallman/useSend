@@ -5,6 +5,7 @@ import {
   DEFAULT_REACT_EMAIL_DOCUMENT,
   parseReactEmailContent,
   ReactEmailEditor,
+  type ReactEmailButtonState,
   type ReactEmailEditorState,
   type ReactEmailDocument,
   type ReactEmailEditorRef,
@@ -154,6 +155,9 @@ export function ReactEmailComposer({
   const [linkDraft, setLinkDraft] = useState("");
   const [linkPanelOpen, setLinkPanelOpen] = useState(false);
   const linkPanelInteractingRef = useRef(false);
+  const [selectedButton, setSelectedButton] =
+    useState<ReactEmailButtonState | null>(null);
+  const buttonPanelInteractingRef = useRef(false);
 
   useEffect(() => {
     setLinkDraft(editorState.linkHref);
@@ -161,15 +165,20 @@ export function ReactEmailComposer({
 
   const handleEditorSelectionChange = (next: ReactEmailEditorState) => {
     setEditorState(next);
-    if (next.button) setLinkPanelOpen(false);
-    else if (next.hasTextSelection) setLinkPanelOpen(true);
-    else if (!linkPanelInteractingRef.current) setLinkPanelOpen(false);
+    if (next.button) {
+      setSelectedButton(next.button);
+      setLinkPanelOpen(false);
+    } else {
+      if (!buttonPanelInteractingRef.current) setSelectedButton(null);
+      if (next.hasTextSelection) setLinkPanelOpen(true);
+      else if (!linkPanelInteractingRef.current) setLinkPanelOpen(false);
+    }
   };
 
   const updateButtonStyle = (changes: Record<string, string>) => {
-    if (!editorState.button) return;
+    if (!selectedButton) return;
     editorRef.current?.updateSelectedButton({
-      style: patchInlineStyle(editorState.button.style, changes),
+      style: patchInlineStyle(selectedButton.style, changes),
     });
   };
 
@@ -228,11 +237,23 @@ export function ReactEmailComposer({
       void refreshOutput();
     }
   };
+  const hasContextPanel =
+    mode === "visual" && (linkPanelOpen || Boolean(selectedButton));
 
   return (
     <Tabs value={mode} onValueChange={changeMode}>
-      <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
-        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b px-3 py-2 sm:px-4">
+      <div
+        className={`overflow-hidden rounded-xl border bg-background shadow-sm ${
+          hasContextPanel
+            ? "lg:grid lg:grid-cols-[minmax(0,1fr)_320px]"
+            : ""
+        }`}
+      >
+        <div
+          className={`flex min-h-14 flex-wrap items-center justify-between gap-3 border-b px-3 py-2 sm:px-4 ${
+            hasContextPanel ? "lg:col-span-2" : ""
+          }`}
+        >
           <TabsList aria-label="Email editor mode">
             <TabsTrigger value="visual">
               <MousePointer2 className="mr-2 h-4 w-4" /> Design
@@ -347,10 +368,14 @@ export function ReactEmailComposer({
 
         {mode === "visual" ? (
           <>
-            <div className="flex flex-wrap items-center gap-1 border-b bg-muted/20 px-3 py-2 sm:px-4">
+            <div
+              className={`flex flex-wrap items-center gap-1 border-b bg-muted/20 px-3 py-2 sm:px-4 ${
+                hasContextPanel ? "lg:col-span-2" : ""
+              }`}
+            >
               <Select
                 value={editorState.blockType}
-                disabled={disabled || Boolean(editorState.button)}
+                disabled={disabled || Boolean(selectedButton)}
                 onValueChange={(value) =>
                   editorRef.current?.setBlockType(
                     value as ReactEmailEditorState["blockType"],
@@ -385,7 +410,7 @@ export function ReactEmailComposer({
                   size="sm"
                   variant={editorState.marks[mark] ? "secondary" : "ghost"}
                   className="h-8 w-8 px-0"
-                  disabled={disabled || Boolean(editorState.button)}
+                  disabled={disabled || Boolean(selectedButton)}
                   aria-label={label}
                   aria-pressed={editorState.marks[mark]}
                   title={label}
@@ -413,7 +438,7 @@ export function ReactEmailComposer({
                     editorState.alignment === alignment ? "secondary" : "ghost"
                   }
                   className="h-8 w-8 px-0"
-                  disabled={disabled || Boolean(editorState.button)}
+                  disabled={disabled || Boolean(selectedButton)}
                   aria-label={label}
                   aria-pressed={editorState.alignment === alignment}
                   title={label}
@@ -479,9 +504,9 @@ export function ReactEmailComposer({
               </Button>
             </div>
 
-            {linkPanelOpen && !editorState.button ? (
+            {linkPanelOpen && !selectedButton ? (
               <div
-                className="flex flex-wrap items-end gap-2 border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4"
+                className="flex flex-wrap items-end gap-2 border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[600px] lg:flex-col lg:items-stretch lg:border-b-0 lg:border-l lg:p-5"
                 onPointerDownCapture={() => {
                   linkPanelInteractingRef.current = true;
                 }}
@@ -543,8 +568,21 @@ export function ReactEmailComposer({
               </div>
             ) : null}
 
-            {editorState.button ? (
-              <div className="border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4">
+            {selectedButton ? (
+              <div
+                className="border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[600px] lg:border-b-0 lg:border-l lg:p-5"
+                onPointerDownCapture={() => {
+                  buttonPanelInteractingRef.current = true;
+                }}
+                onFocusCapture={() => {
+                  buttonPanelInteractingRef.current = true;
+                }}
+                onBlurCapture={() => {
+                  window.setTimeout(() => {
+                    buttonPanelInteractingRef.current = false;
+                  });
+                }}
+              >
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium">Button settings</p>
@@ -556,11 +594,11 @@ export function ReactEmailComposer({
                     Selected
                   </span>
                 </div>
-                <div className="grid gap-3 lg:grid-cols-[minmax(140px,1fr)_minmax(180px,1.4fr)_auto_auto] lg:items-end">
+                <div className="grid gap-3">
                   <label className="space-y-1 text-xs font-medium">
                     <span>Label</span>
                     <Input
-                      value={editorState.button.text}
+                      value={selectedButton.text}
                       disabled={disabled}
                       className="h-9 bg-background"
                       onChange={(event) =>
@@ -573,7 +611,7 @@ export function ReactEmailComposer({
                   <label className="space-y-1 text-xs font-medium">
                     <span>Link URL</span>
                     <Input
-                      value={editorState.button.href}
+                      value={selectedButton.href}
                       disabled={disabled}
                       className="h-9 bg-background"
                       placeholder="https://example.com"
@@ -624,7 +662,7 @@ export function ReactEmailComposer({
                       <input
                         type="color"
                         value={getInlineStyleValue(
-                          editorState.button.style,
+                          selectedButton.style,
                           "background-color",
                           "#111827",
                         )}
@@ -643,7 +681,7 @@ export function ReactEmailComposer({
                       <input
                         type="color"
                         value={getInlineStyleValue(
-                          editorState.button.style,
+                          selectedButton.style,
                           "color",
                           "#ffffff",
                         )}
@@ -671,7 +709,7 @@ export function ReactEmailComposer({
                       type="button"
                       size="sm"
                       variant={
-                        editorState.button?.alignment === alignment
+                        selectedButton.alignment === alignment
                           ? "secondary"
                           : "outline"
                       }
@@ -693,7 +731,10 @@ export function ReactEmailComposer({
                     className="ml-auto h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     disabled={disabled}
                     onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => editorRef.current?.deleteSelectedButton()}
+                    onClick={() => {
+                      editorRef.current?.deleteSelectedButton();
+                      setSelectedButton(null);
+                    }}
                   >
                     <Trash2 className="mr-1.5 h-4 w-4" /> Delete button
                   </Button>
@@ -703,7 +744,10 @@ export function ReactEmailComposer({
           </>
         ) : null}
 
-        <TabsContent value="visual" className="m-0">
+        <TabsContent
+          value="visual"
+          className="m-0 min-w-0 lg:col-start-1 lg:row-start-3"
+        >
           <div className="bg-slate-100 p-3 dark:bg-slate-950/50 sm:p-6 lg:p-10">
             <div className="mx-auto min-h-[600px] w-full max-w-[680px] overflow-visible bg-white shadow-[0_12px_40px_rgba(15,23,42,0.10)] ring-1 ring-slate-200">
               <ReactEmailEditor

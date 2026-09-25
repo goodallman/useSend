@@ -184,12 +184,21 @@ function getEditorState(editor: EditorInstance): ReactEmailEditorState {
 function toPublicRef(
   getRef: () => BaseEmailEditorRef | null,
   getTextSelection: () => TextSelectionRange | null,
+  getButtonPosition: () => number | null,
 ): ReactEmailEditorRef {
   const restoreTextSelection = (editor: EditorInstance) => {
     const selection = getTextSelection();
     return selection
       ? editor.chain().focus().setTextSelection(selection)
       : editor.chain().focus();
+  };
+  const getEditableButton = (editor: EditorInstance) => {
+    const activeButton = findActiveButton(editor);
+    if (activeButton) return activeButton;
+    const position = getButtonPosition();
+    if (position === null) return null;
+    const node = editor.state.doc.nodeAt(position);
+    return node?.type.name === "button" ? { node, pos: position } : null;
   };
 
   return {
@@ -281,7 +290,7 @@ function toPublicRef(
     updateSelectedButton: (value) => {
       const editor = getRef()?.editor;
       if (!editor) return;
-      const activeButton = findActiveButton(editor);
+      const activeButton = getEditableButton(editor);
       if (!activeButton) return;
 
       const attrs = {
@@ -320,7 +329,7 @@ function toPublicRef(
     deleteSelectedButton: () => {
       const editor = getRef()?.editor;
       if (!editor) return;
-      const activeButton = findActiveButton(editor);
+      const activeButton = getEditableButton(editor);
       if (!activeButton) return;
       editor
         .chain()
@@ -346,6 +355,7 @@ export const ReactEmailEditor = forwardRef<
 ) {
   const editorRef = useRef<BaseEmailEditorRef>(null);
   const textSelectionRef = useRef<TextSelectionRange | null>(null);
+  const buttonPositionRef = useRef<number | null>(null);
   const selectionCleanupRef = useRef<(() => void) | null>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
@@ -358,6 +368,7 @@ export const ReactEmailEditor = forwardRef<
       toPublicRef(
         () => editorRef.current,
         () => textSelectionRef.current,
+        () => buttonPositionRef.current,
       ),
     [],
   );
@@ -375,12 +386,14 @@ export const ReactEmailEditor = forwardRef<
             to: ref.editor.state.selection.to,
           };
         }
+        const activeButton = findActiveButton(ref.editor);
+        if (activeButton) buttonPositionRef.current = activeButton.pos;
         onSelectionChangeRef.current?.(state);
       };
       ref.editor?.on("selectionUpdate", notifySelection);
       ref.editor?.on("transaction", notifySelection);
       const editorElement = ref.editor?.view.dom;
-      const selectClickedButton = (event: PointerEvent) => {
+      const selectClickedButton = (event: Event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
         const button = target.closest(".node-button");
@@ -401,17 +414,30 @@ export const ReactEmailEditor = forwardRef<
         event.preventDefault();
         ref.editor.chain().focus().setNodeSelection(buttonPosition).run();
       };
-      editorElement?.addEventListener("pointerdown", selectClickedButton);
+      editorElement?.addEventListener("pointerdown", selectClickedButton, true);
+      editorElement?.addEventListener("mousedown", selectClickedButton, true);
+      editorElement?.addEventListener("click", selectClickedButton, true);
       selectionCleanupRef.current = () => {
         ref.editor?.off("selectionUpdate", notifySelection);
         ref.editor?.off("transaction", notifySelection);
-        editorElement?.removeEventListener("pointerdown", selectClickedButton);
+        editorElement?.removeEventListener(
+          "pointerdown",
+          selectClickedButton,
+          true,
+        );
+        editorElement?.removeEventListener(
+          "mousedown",
+          selectClickedButton,
+          true,
+        );
+        editorElement?.removeEventListener("click", selectClickedButton, true);
       };
       notifySelection();
       onReady?.(
         toPublicRef(
           () => ref,
           () => textSelectionRef.current,
+          () => buttonPositionRef.current,
         ),
       );
     },
