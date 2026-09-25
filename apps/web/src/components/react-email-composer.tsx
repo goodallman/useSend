@@ -5,6 +5,7 @@ import {
   DEFAULT_REACT_EMAIL_DOCUMENT,
   parseReactEmailContent,
   ReactEmailEditor,
+  type ReactEmailEditorState,
   type ReactEmailDocument,
   type ReactEmailEditorRef,
 } from "@usesend/react-email-editor";
@@ -17,20 +18,40 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@usesend/ui/src/dropdown-menu";
+import { Input } from "@usesend/ui/src/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@usesend/ui/src/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@usesend/ui/src/tabs";
 import { Textarea } from "@usesend/ui/src/textarea";
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  Bold,
   Braces,
   ChevronDown,
   Code2,
   Eye,
+  Italic,
   Link2,
+  Minus,
   Monitor,
   MousePointer2,
+  Plus,
   RefreshCw,
+  Redo2,
   Smartphone,
+  Strikethrough,
+  Trash2,
+  Underline,
+  Undo2,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
 interface ReactEmailComposerProps {
@@ -48,6 +69,58 @@ interface ReactEmailComposerProps {
 
 type EditorMode = "visual" | "html" | "preview";
 type PreviewSize = "desktop" | "mobile";
+
+const initialEditorState: ReactEmailEditorState = {
+  blockType: "paragraph",
+  alignment: "left",
+  marks: { bold: false, italic: false, underline: false, strike: false },
+  hasTextSelection: false,
+  linkHref: "",
+  button: null,
+};
+
+function patchInlineStyle(
+  style: string,
+  changes: Record<string, string>,
+): string {
+  const declarations = new Map<string, string>();
+  for (const declaration of style.split(";")) {
+    const separator = declaration.indexOf(":");
+    if (separator === -1) continue;
+    declarations.set(
+      declaration.slice(0, separator).trim(),
+      declaration.slice(separator + 1).trim(),
+    );
+  }
+  for (const [property, value] of Object.entries(changes)) {
+    if (value) declarations.set(property, value);
+    else declarations.delete(property);
+  }
+  return [...declarations]
+    .map(([property, value]) => `${property}: ${value}`)
+    .join("; ");
+}
+
+function getInlineStyleValue(
+  style: string,
+  property: string,
+  fallback: string,
+) {
+  for (const declaration of style.split(";")) {
+    const separator = declaration.indexOf(":");
+    if (separator === -1) continue;
+    if (declaration.slice(0, separator).trim() === property) {
+      const value = declaration.slice(separator + 1).trim();
+      const rgb = value.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+      if (!rgb) return /^#[\da-f]{6}$/i.test(value) ? value : fallback;
+      return `#${rgb
+        .slice(1)
+        .map((channel) => Number(channel).toString(16).padStart(2, "0"))
+        .join("")}`;
+    }
+  }
+  return fallback;
+}
 
 export function ReactEmailComposer({
   content,
@@ -73,6 +146,23 @@ export function ReactEmailComposer({
   const [mode, setMode] = useState<EditorMode>("visual");
   const [previewSize, setPreviewSize] = useState<PreviewSize>("desktop");
   const [isExporting, setIsExporting] = useState(false);
+  const [sourceIsCustom, setSourceIsCustom] = useState(
+    Boolean(parsedContent?.htmlOverride),
+  );
+  const [editorState, setEditorState] =
+    useState<ReactEmailEditorState>(initialEditorState);
+  const [linkDraft, setLinkDraft] = useState("");
+
+  useEffect(() => {
+    setLinkDraft(editorState.linkHref);
+  }, [editorState.hasTextSelection, editorState.linkHref]);
+
+  const updateButtonStyle = (changes: Record<string, string>) => {
+    if (!editorState.button) return;
+    editorRef.current?.updateSelectedButton({
+      style: patchInlineStyle(editorState.button.style, changes),
+    });
+  };
 
   const refreshOutput = useCallback(async () => {
     if (!editorRef.current) return null;
@@ -81,6 +171,7 @@ export function ReactEmailComposer({
       const output = await editorRef.current.getEmail();
       setHtml(output.html);
       setText(output.text);
+      setSourceIsCustom(false);
       return output;
     } finally {
       setIsExporting(false);
@@ -124,7 +215,9 @@ export function ReactEmailComposer({
   const changeMode = (value: string) => {
     const nextMode = value as EditorMode;
     setMode(nextMode);
-    if (nextMode === "preview") void refreshOutput();
+    if (nextMode === "preview" && mode !== "html" && !sourceIsCustom) {
+      void refreshOutput();
+    }
   };
 
   return (
@@ -174,6 +267,12 @@ export function ReactEmailComposer({
                   variant="ghost"
                   isLoading={isExporting}
                   aria-label="Refresh preview"
+                  disabled={sourceIsCustom}
+                  title={
+                    sourceIsCustom
+                      ? "The preview already shows your current HTML source"
+                      : "Regenerate from the visual design"
+                  }
                   onClick={() => void refreshOutput()}
                 >
                   <RefreshCw className="mr-2 h-4 w-4" /> Refresh
@@ -237,6 +336,335 @@ export function ReactEmailComposer({
           </div>
         </div>
 
+        {mode === "visual" ? (
+          <>
+            <div className="flex flex-wrap items-center gap-1 border-b bg-muted/20 px-3 py-2 sm:px-4">
+              <Select
+                value={editorState.blockType}
+                disabled={disabled || Boolean(editorState.button)}
+                onValueChange={(value) =>
+                  editorRef.current?.setBlockType(
+                    value as ReactEmailEditorState["blockType"],
+                  )
+                }
+              >
+                <SelectTrigger
+                  className="mr-1 h-8 w-[132px]"
+                  aria-label="Text style"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paragraph">Paragraph</SelectItem>
+                  <SelectItem value="heading1">Heading 1</SelectItem>
+                  <SelectItem value="heading2">Heading 2</SelectItem>
+                  <SelectItem value="heading3">Heading 3</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(
+                [
+                  ["bold", Bold, "Bold"],
+                  ["italic", Italic, "Italic"],
+                  ["underline", Underline, "Underline"],
+                  ["strike", Strikethrough, "Strikethrough"],
+                ] as const
+              ).map(([mark, Icon, label]) => (
+                <Button
+                  key={mark}
+                  type="button"
+                  size="sm"
+                  variant={editorState.marks[mark] ? "secondary" : "ghost"}
+                  className="h-8 w-8 px-0"
+                  disabled={disabled || Boolean(editorState.button)}
+                  aria-label={label}
+                  aria-pressed={editorState.marks[mark]}
+                  title={label}
+                  onClick={() => editorRef.current?.toggleMark(mark)}
+                >
+                  <Icon className="h-4 w-4" />
+                </Button>
+              ))}
+
+              <span className="mx-1 h-5 w-px bg-border" />
+
+              {(
+                [
+                  ["left", AlignLeft, "Align left"],
+                  ["center", AlignCenter, "Align center"],
+                  ["right", AlignRight, "Align right"],
+                ] as const
+              ).map(([alignment, Icon, label]) => (
+                <Button
+                  key={alignment}
+                  type="button"
+                  size="sm"
+                  variant={
+                    editorState.alignment === alignment ? "secondary" : "ghost"
+                  }
+                  className="h-8 w-8 px-0"
+                  disabled={disabled || Boolean(editorState.button)}
+                  aria-label={label}
+                  aria-pressed={editorState.alignment === alignment}
+                  title={label}
+                  onClick={() => editorRef.current?.setTextAlignment(alignment)}
+                >
+                  <Icon className="h-4 w-4" />
+                </Button>
+              ))}
+
+              <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
+
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 px-0"
+                disabled={disabled}
+                aria-label="Undo"
+                title="Undo"
+                onClick={() => editorRef.current?.undo()}
+              >
+                <Undo2 className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 px-0"
+                disabled={disabled}
+                aria-label="Redo"
+                title="Redo"
+                onClick={() => editorRef.current?.redo()}
+              >
+                <Redo2 className="h-4 w-4" />
+              </Button>
+
+              <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
+
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8"
+                disabled={disabled}
+                onClick={() => editorRef.current?.insertButton()}
+              >
+                <Plus className="mr-1.5 h-4 w-4" /> Button
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8"
+                disabled={disabled}
+                onClick={() => editorRef.current?.insertDivider()}
+              >
+                <Minus className="mr-1.5 h-4 w-4" /> Divider
+              </Button>
+            </div>
+
+            {editorState.hasTextSelection && !editorState.button ? (
+              <div className="flex flex-wrap items-end gap-2 border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4">
+                <label className="min-w-[220px] flex-1 space-y-1 text-xs font-medium">
+                  <span>Link for selected text</span>
+                  <Input
+                    value={linkDraft}
+                    disabled={disabled}
+                    className="h-9 bg-background"
+                    placeholder="https://example.com"
+                    onChange={(event) => setLinkDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        editorRef.current?.updateSelectedLink(linkDraft);
+                      }
+                    }}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9"
+                  disabled={disabled || !linkDraft.trim()}
+                  onClick={() =>
+                    editorRef.current?.updateSelectedLink(linkDraft)
+                  }
+                >
+                  <Link2 className="mr-1.5 h-4 w-4" /> Apply link
+                </Button>
+                {editorState.linkHref ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-9"
+                    disabled={disabled}
+                    onClick={() => editorRef.current?.updateSelectedLink("")}
+                  >
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+
+            {editorState.button ? (
+              <div className="border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Button settings</p>
+                    <p className="text-xs text-muted-foreground">
+                      Edit the selected button without covering the email.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-blue-100 px-2 py-1 text-[11px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                    Selected
+                  </span>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-[minmax(140px,1fr)_minmax(180px,1.4fr)_auto_auto] lg:items-end">
+                  <label className="space-y-1 text-xs font-medium">
+                    <span>Label</span>
+                    <Input
+                      value={editorState.button.text}
+                      disabled={disabled}
+                      className="h-9 bg-background"
+                      onChange={(event) =>
+                        editorRef.current?.updateSelectedButton({
+                          text: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs font-medium">
+                    <span>Link URL</span>
+                    <Input
+                      value={editorState.button.href}
+                      disabled={disabled}
+                      className="h-9 bg-background"
+                      placeholder="https://example.com"
+                      onChange={(event) =>
+                        editorRef.current?.updateSelectedButton({
+                          href: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <div className="space-y-1">
+                    <span className="block text-xs font-medium">Size</span>
+                    <div className="flex h-9 rounded-md border bg-background p-0.5">
+                      {(
+                        [
+                          ["S", "8px", "14px", "14px"],
+                          ["M", "12px", "20px", "16px"],
+                          ["L", "16px", "28px", "18px"],
+                        ] as const
+                      ).map(([label, vertical, horizontal, fontSize]) => (
+                        <Button
+                          key={label}
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 min-w-8 px-2 text-xs"
+                          disabled={disabled}
+                          aria-label={`${label} button size`}
+                          onClick={() =>
+                            updateButtonStyle({
+                              "padding-top": vertical,
+                              "padding-right": horizontal,
+                              "padding-bottom": vertical,
+                              "padding-left": horizontal,
+                              "font-size": fontSize,
+                            })
+                          }
+                        >
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <label className="space-y-1 text-xs font-medium">
+                      <span className="block">Button</span>
+                      <input
+                        type="color"
+                        value={getInlineStyleValue(
+                          editorState.button.style,
+                          "background-color",
+                          "#111827",
+                        )}
+                        disabled={disabled}
+                        className="h-9 w-10 cursor-pointer rounded-md border bg-background p-1"
+                        aria-label="Button color"
+                        onChange={(event) =>
+                          updateButtonStyle({
+                            "background-color": event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="space-y-1 text-xs font-medium">
+                      <span className="block">Text</span>
+                      <input
+                        type="color"
+                        value={getInlineStyleValue(
+                          editorState.button.style,
+                          "color",
+                          "#ffffff",
+                        )}
+                        disabled={disabled}
+                        className="h-9 w-10 cursor-pointer rounded-md border bg-background p-1"
+                        aria-label="Button text color"
+                        onChange={(event) =>
+                          updateButtonStyle({ color: event.target.value })
+                        }
+                      />
+                    </label>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs font-medium">Position</span>
+                  {(
+                    [
+                      ["left", AlignLeft],
+                      ["center", AlignCenter],
+                      ["right", AlignRight],
+                    ] as const
+                  ).map(([alignment, Icon]) => (
+                    <Button
+                      key={alignment}
+                      type="button"
+                      size="sm"
+                      variant={
+                        editorState.button?.alignment === alignment
+                          ? "secondary"
+                          : "outline"
+                      }
+                      className="h-8 w-8 px-0"
+                      disabled={disabled}
+                      aria-label={`Position button ${alignment}`}
+                      onClick={() =>
+                        editorRef.current?.updateSelectedButton({ alignment })
+                      }
+                    >
+                      <Icon className="h-4 w-4" />
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={disabled}
+                    onClick={() => editorRef.current?.deleteSelectedButton()}
+                  >
+                    <Trash2 className="mr-1.5 h-4 w-4" /> Delete button
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
         <TabsContent value="visual" className="m-0">
           <div className="bg-slate-100 p-3 dark:bg-slate-950/50 sm:p-6 lg:p-10">
             <div className="mx-auto min-h-[600px] w-full max-w-[680px] overflow-visible bg-white shadow-[0_12px_40px_rgba(15,23,42,0.10)] ring-1 ring-slate-200">
@@ -245,6 +673,7 @@ export function ReactEmailComposer({
                 content={initialDocument}
                 editable={!disabled}
                 onDocumentChange={handleDocumentChange}
+                onSelectionChange={setEditorState}
                 onReady={() => {
                   if (!html) void refreshOutput();
                 }}
@@ -253,7 +682,7 @@ export function ReactEmailComposer({
                     ? async (file) => ({ url: await uploadImage(file) })
                     : undefined
                 }
-                className="min-h-[600px] w-full max-w-full overflow-hidden px-6 py-10 text-slate-950 sm:px-12 sm:py-14 [&_.node-container]:!w-full [&_.node-container]:!max-w-full [&_.tiptap]:mx-auto [&_.tiptap]:w-full [&_.tiptap]:max-w-[584px] [&_.tiptap]:break-words [&_.tiptap]:outline-none"
+                className="min-h-[600px] w-full max-w-full px-6 py-10 text-slate-950 sm:px-12 sm:py-14 [&_.node-container]:!w-full [&_.node-container]:!max-w-full [&_.tiptap]:mx-auto [&_.tiptap]:w-full [&_.tiptap]:max-w-[584px] [&_.tiptap]:break-words [&_.tiptap]:outline-none"
               />
             </div>
           </div>
@@ -273,7 +702,10 @@ export function ReactEmailComposer({
                 aria-label="Email HTML source"
                 value={html}
                 readOnly={disabled}
-                onChange={(event) => setHtml(event.target.value)}
+                onChange={(event) => {
+                  setHtml(event.target.value);
+                  setSourceIsCustom(true);
+                }}
                 className="min-h-[560px] resize-y rounded-none border-0 p-5 font-mono text-xs focus-visible:ring-0"
                 spellCheck={false}
               />
@@ -291,7 +723,7 @@ export function ReactEmailComposer({
                 previewSize === "mobile" ? "max-w-[390px]" : "max-w-[680px]"
               }`}
             />
-            {text ? (
+            {text && !sourceIsCustom ? (
               <details className="mx-auto mt-4 max-w-[680px] rounded-lg border bg-background px-4 py-3 text-sm">
                 <summary className="cursor-pointer font-medium">
                   Plain-text version

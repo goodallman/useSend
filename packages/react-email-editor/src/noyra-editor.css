@@ -1,0 +1,6 @@
+/* The upstream floating menus obscure nearby email content and expose only a
+ * subset of the available controls. Noyra provides a persistent toolbar and
+ * contextual button controls in the composer instead. */
+[data-re-bubble-menu] {
+  display: none !important;
+}
