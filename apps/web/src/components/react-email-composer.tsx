@@ -51,6 +51,7 @@ import {
   Trash2,
   Underline,
   Undo2,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
@@ -157,7 +158,6 @@ export function ReactEmailComposer({
   const linkPanelInteractingRef = useRef(false);
   const [selectedButton, setSelectedButton] =
     useState<ReactEmailButtonState | null>(null);
-  const buttonPanelInteractingRef = useRef(false);
 
   useEffect(() => {
     setLinkDraft(editorState.linkHref);
@@ -168,10 +168,11 @@ export function ReactEmailComposer({
     if (next.button) {
       setSelectedButton(next.button);
       setLinkPanelOpen(false);
-    } else {
-      if (!buttonPanelInteractingRef.current) setSelectedButton(null);
-      if (next.hasTextSelection) setLinkPanelOpen(true);
-      else if (!linkPanelInteractingRef.current) setLinkPanelOpen(false);
+    } else if (next.hasTextSelection) {
+      setSelectedButton(null);
+      setLinkPanelOpen(true);
+    } else if (!linkPanelInteractingRef.current) {
+      setLinkPanelOpen(false);
     }
   };
 
@@ -242,18 +243,8 @@ export function ReactEmailComposer({
 
   return (
     <Tabs value={mode} onValueChange={changeMode}>
-      <div
-        className={`overflow-hidden rounded-xl border bg-background shadow-sm ${
-          hasContextPanel
-            ? "lg:grid lg:grid-cols-[minmax(0,1fr)_320px]"
-            : ""
-        }`}
-      >
-        <div
-          className={`flex min-h-14 flex-wrap items-center justify-between gap-3 border-b px-3 py-2 sm:px-4 ${
-            hasContextPanel ? "lg:col-span-2" : ""
-          }`}
-        >
+      <div className="relative overflow-hidden rounded-xl border bg-background shadow-sm lg:overflow-visible">
+        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b px-3 py-2 sm:px-4">
           <TabsList aria-label="Email editor mode">
             <TabsTrigger value="visual">
               <MousePointer2 className="mr-2 h-4 w-4" /> Design
@@ -368,11 +359,7 @@ export function ReactEmailComposer({
 
         {mode === "visual" ? (
           <>
-            <div
-              className={`flex flex-wrap items-center gap-1 border-b bg-muted/20 px-3 py-2 sm:px-4 ${
-                hasContextPanel ? "lg:col-span-2" : ""
-              }`}
-            >
+            <div className="flex flex-wrap items-center gap-1 border-b bg-muted/20 px-3 py-2 sm:px-4">
               <Select
                 value={editorState.blockType}
                 disabled={disabled || Boolean(selectedButton)}
@@ -506,7 +493,7 @@ export function ReactEmailComposer({
 
             {linkPanelOpen && !selectedButton ? (
               <div
-                className="flex flex-wrap items-end gap-2 border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[600px] lg:flex-col lg:items-stretch lg:border-b-0 lg:border-l lg:p-5"
+                className="flex flex-wrap items-end gap-2 border-b bg-blue-50/95 px-3 py-3 text-slate-900 dark:bg-blue-950/95 dark:text-foreground sm:px-4 lg:fixed lg:right-3 lg:top-24 lg:z-40 lg:max-h-[calc(100vh-7rem)] lg:w-72 lg:flex-col lg:items-stretch lg:overflow-y-auto lg:rounded-xl lg:border lg:p-5 lg:shadow-2xl"
                 onPointerDownCapture={() => {
                   linkPanelInteractingRef.current = true;
                 }}
@@ -570,18 +557,7 @@ export function ReactEmailComposer({
 
             {selectedButton ? (
               <div
-                className="border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[600px] lg:border-b-0 lg:border-l lg:p-5"
-                onPointerDownCapture={() => {
-                  buttonPanelInteractingRef.current = true;
-                }}
-                onFocusCapture={() => {
-                  buttonPanelInteractingRef.current = true;
-                }}
-                onBlurCapture={() => {
-                  window.setTimeout(() => {
-                    buttonPanelInteractingRef.current = false;
-                  });
-                }}
+                className="border-b bg-blue-50/95 px-3 py-3 text-slate-900 dark:bg-blue-950/95 dark:text-foreground sm:px-4 lg:fixed lg:right-3 lg:top-24 lg:z-40 lg:max-h-[calc(100vh-7rem)] lg:w-72 lg:overflow-y-auto lg:rounded-xl lg:border lg:p-5 lg:shadow-2xl"
               >
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
@@ -590,9 +566,21 @@ export function ReactEmailComposer({
                       Edit the selected button without covering the email.
                     </p>
                   </div>
-                  <span className="rounded-full bg-blue-100 px-2 py-1 text-[11px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                    Selected
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="rounded-full bg-blue-100 px-2 py-1 text-[11px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                      Selected
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 px-0"
+                      aria-label="Close button settings"
+                      onClick={() => setSelectedButton(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid gap-3">
                   <label className="space-y-1 text-xs font-medium">
@@ -746,10 +734,14 @@ export function ReactEmailComposer({
 
         <TabsContent
           value="visual"
-          className="m-0 min-w-0 lg:col-start-1 lg:row-start-3"
+          className="m-0 min-w-0"
         >
           <div className="bg-slate-100 p-3 dark:bg-slate-950/50 sm:p-6 lg:p-10">
-            <div className="mx-auto min-h-[600px] w-full max-w-[680px] overflow-visible bg-white shadow-[0_12px_40px_rgba(15,23,42,0.10)] ring-1 ring-slate-200">
+            <div
+              className={`mx-auto min-h-[600px] w-full max-w-[680px] overflow-visible bg-white shadow-[0_12px_40px_rgba(15,23,42,0.10)] ring-1 ring-slate-200 ${
+                hasContextPanel ? "lg:ml-0 lg:mr-auto" : ""
+              }`}
+            >
               <ReactEmailEditor
                 ref={editorRef}
                 content={initialDocument}
