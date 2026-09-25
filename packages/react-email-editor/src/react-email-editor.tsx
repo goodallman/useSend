@@ -379,9 +379,29 @@ export const ReactEmailEditor = forwardRef<
       };
       ref.editor?.on("selectionUpdate", notifySelection);
       ref.editor?.on("transaction", notifySelection);
+      const editorElement = ref.editor?.view.dom;
+      const selectClickedButton = (event: PointerEvent) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const button = target.closest(".node-button");
+        if (!button || !ref.editor) return;
+
+        const contentPosition = ref.editor.view.posAtDOM(button, 0);
+        const buttonPosition = [contentPosition - 1, contentPosition].find(
+          (position) =>
+            position >= 0 &&
+            ref.editor?.state.doc.nodeAt(position)?.type.name === "button",
+        );
+        if (buttonPosition === undefined) return;
+
+        event.preventDefault();
+        ref.editor.chain().focus().setNodeSelection(buttonPosition).run();
+      };
+      editorElement?.addEventListener("pointerdown", selectClickedButton);
       selectionCleanupRef.current = () => {
         ref.editor?.off("selectionUpdate", notifySelection);
         ref.editor?.off("transaction", notifySelection);
+        editorElement?.removeEventListener("pointerdown", selectClickedButton);
       };
       notifySelection();
       onReady?.(
