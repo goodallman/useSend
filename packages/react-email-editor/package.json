@@ -1,0 +1,39 @@
+{
+  "name": "@usesend/react-email-editor",
+  "version": "0.0.1",
+  "description": "React Email based editor for useSend",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@types/eslint": "^9.6.1",
+    "@types/react": "^19.1.2",
+    "@usesend/eslint-config": "workspace:*",
+    "@usesend/typescript-config": "workspace:*",
+    "eslint": "^8.57.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3"
+  },
+  "peerDependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "dependencies": {
+    "@react-email/editor": "1.7.10"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
