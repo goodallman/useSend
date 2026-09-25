@@ -191,6 +191,17 @@ function toPublicRef(
   getButtonPosition: () => number | null,
   actionHistory: EditorActionHistory,
 ): ReactEmailEditorRef {
+  const restoreDocument = (
+    editor: EditorInstance,
+    document: ReactEmailDocument,
+  ) => {
+    const restored = editor.schema.nodeFromJSON(document);
+    editor.view.dispatch(
+      editor.state.tr
+        .replaceWith(0, editor.state.doc.content.size, restored.content)
+        .setMeta("addToHistory", false),
+    );
+  };
   const recordAction = (editor: EditorInstance) => {
     actionHistory.undo.push(editor.getJSON());
     if (actionHistory.undo.length > 100) actionHistory.undo.shift();
@@ -266,7 +277,7 @@ function toPublicRef(
       const previous = actionHistory.undo.pop();
       if (previous) {
         actionHistory.redo.push(editor.getJSON());
-        editor.commands.setContent(previous);
+        restoreDocument(editor, previous);
         return;
       }
       (
@@ -283,7 +294,7 @@ function toPublicRef(
       const next = actionHistory.redo.pop();
       if (next) {
         actionHistory.undo.push(editor.getJSON());
-        editor.commands.setContent(next);
+        restoreDocument(editor, next);
         return;
       }
       (
