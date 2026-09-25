@@ -11,8 +11,6 @@
     "start:web:local": "pnpm load-env -- cd apps/web && pnpm start",
     "dev": "pnpm load-env -- turbo dev",
     "dev:editor-lab": "node scripts/dev-editor-lab.mjs",
-    "dev:web:local": "dotenv -e .env -- pnpm --dir apps/web dev",
-    "setup:coolify-dev": "node scripts/configure-coolify-dev.mjs",
     "test:web": "pnpm --filter=web test",
     "test:web:all": "pnpm test:infra:up && (pnpm --filter=web test:all; code=$?; pnpm test:infra:down; exit $code)",
     "test:web:all:raw": "pnpm --filter=web test:all",
