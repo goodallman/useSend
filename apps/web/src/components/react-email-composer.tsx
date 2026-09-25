@@ -296,8 +296,8 @@ export function ReactEmailComposer({
 
   return (
     <Tabs value={mode} onValueChange={changeMode}>
-      <div className="relative overflow-hidden rounded-xl border bg-background shadow-sm lg:overflow-visible">
-        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b px-3 py-2 sm:px-4">
+      <div className="overflow-hidden rounded-xl border bg-background shadow-sm lg:grid lg:grid-cols-[minmax(0,1fr)_252px]">
+        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b px-3 py-2 sm:px-4 lg:col-span-2">
           <TabsList aria-label="Email editor mode">
             <TabsTrigger value="visual">
               <MousePointer2 className="mr-2 h-4 w-4" /> Design
@@ -416,7 +416,7 @@ export function ReactEmailComposer({
 
         {mode === "visual" ? (
           <>
-            <div className="flex flex-wrap items-center gap-1 border-b bg-muted/20 px-3 py-2 sm:px-4">
+            <div className="flex flex-wrap items-center gap-1 border-b bg-muted/20 px-3 py-2 sm:px-4 lg:col-span-2">
               <Select
                 value={editorState.blockType}
                 disabled={disabled || Boolean(selectedButton)}
@@ -562,7 +562,7 @@ export function ReactEmailComposer({
 
             {linkPanelOpen && !selectedButton ? (
               <div
-                className="flex flex-wrap items-end gap-2 border-b bg-blue-50/95 px-3 py-3 text-slate-900 dark:bg-blue-950/95 dark:text-foreground sm:px-4 lg:fixed lg:right-3 lg:top-24 lg:z-40 lg:max-h-[calc(100vh-7rem)] lg:w-72 lg:flex-col lg:items-stretch lg:overflow-y-auto lg:rounded-xl lg:border lg:p-5 lg:shadow-2xl"
+                className="flex flex-wrap items-end gap-2 border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[680px] lg:flex-col lg:items-stretch lg:border-b-0 lg:border-l lg:p-5"
                 onPointerDownCapture={() => {
                   linkPanelInteractingRef.current = true;
                 }}
@@ -632,7 +632,7 @@ export function ReactEmailComposer({
 
             {selectedButton ? (
               <div
-                className="border-b bg-blue-50/95 px-3 py-3 text-slate-900 dark:bg-blue-950/95 dark:text-foreground sm:px-4 lg:fixed lg:right-3 lg:top-24 lg:z-40 lg:max-h-[calc(100vh-7rem)] lg:w-72 lg:overflow-y-auto lg:rounded-xl lg:border lg:p-5 lg:shadow-2xl"
+                className="border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[680px] lg:border-b-0 lg:border-l lg:p-5"
               >
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
@@ -812,19 +812,31 @@ export function ReactEmailComposer({
                 </div>
               </div>
             ) : null}
+
+            {!hasContextPanel ? (
+              <div className="hidden min-h-[680px] border-l bg-muted/10 p-5 lg:col-start-2 lg:row-start-3 lg:block">
+                <div className="flex items-start gap-2 text-muted-foreground">
+                  <MousePointer2 className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Content settings
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed">
+                      Select text, a link, or a button to edit its settings here.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </>
         ) : null}
 
         <TabsContent
           value="visual"
-          className="m-0 min-w-0"
+          className="m-0 min-w-0 lg:col-start-1 lg:row-start-3"
         >
-          <div className="bg-slate-100 p-3 dark:bg-slate-950/50 sm:p-6 lg:p-10">
-            <div
-              className={`mx-auto min-h-[600px] w-full max-w-[680px] overflow-visible bg-white shadow-[0_12px_40px_rgba(15,23,42,0.10)] ring-1 ring-slate-200 ${
-                hasContextPanel ? "lg:ml-0 lg:mr-auto" : ""
-              }`}
-            >
+          <div className="bg-slate-100 p-3 dark:bg-slate-950/50 sm:p-6 lg:py-10 lg:pl-10 lg:pr-0">
+            <div className="mx-auto min-h-[600px] w-full max-w-[680px] overflow-visible bg-white shadow-[0_12px_40px_rgba(15,23,42,0.10)] ring-1 ring-slate-200">
               <ReactEmailEditor
                 key={editorRevision}
                 ref={editorRef}
@@ -846,7 +858,7 @@ export function ReactEmailComposer({
           </div>
         </TabsContent>
 
-        <TabsContent value="html" className="m-0">
+        <TabsContent value="html" className="m-0 lg:col-span-2">
           <div className="bg-slate-100 p-3 dark:bg-slate-950/50 sm:p-6 lg:p-10">
             <div className="mx-auto max-w-5xl overflow-hidden rounded-lg border bg-background shadow-sm">
               <div className="border-b px-4 py-3">
@@ -871,7 +883,7 @@ export function ReactEmailComposer({
           </div>
         </TabsContent>
 
-        <TabsContent value="preview" className="m-0">
+        <TabsContent value="preview" className="m-0 lg:col-span-2">
           <div className="min-h-[680px] bg-slate-100 p-3 dark:bg-slate-950/50 sm:p-6 lg:p-10">
             <iframe
               title="Email preview"
