@@ -145,6 +145,7 @@ export function ReactEmailComposer({
   const initialDocument =
     parsedContent?.document ?? DEFAULT_REACT_EMAIL_DOCUMENT;
   const [document, setDocument] = useState<ReactEmailDocument>(initialDocument);
+  const [editorRevision, setEditorRevision] = useState(0);
   const [html, setHtml] = useState(
     parsedContent?.htmlOverride ?? initialHtml ?? "",
   );
@@ -187,6 +188,10 @@ export function ReactEmailComposer({
     }
     editorHistoryRef.current.redo.push(editor.getDocument());
     editor.setContent(previous);
+    setDocument(previous);
+    setSelectedButton(null);
+    setLinkPanelOpen(false);
+    setEditorRevision((revision) => revision + 1);
   };
 
   const redoEditorAction = () => {
@@ -199,6 +204,10 @@ export function ReactEmailComposer({
     }
     editorHistoryRef.current.undo.push(editor.getDocument());
     editor.setContent(next);
+    setDocument(next);
+    setSelectedButton(null);
+    setLinkPanelOpen(false);
+    setEditorRevision((revision) => revision + 1);
   };
 
   useEffect(() => {
@@ -817,8 +826,9 @@ export function ReactEmailComposer({
               }`}
             >
               <ReactEmailEditor
+                key={editorRevision}
                 ref={editorRef}
-                content={initialDocument}
+                content={document}
                 editable={!disabled}
                 onDocumentChange={handleDocumentChange}
                 onSelectionChange={handleEditorSelectionChange}
