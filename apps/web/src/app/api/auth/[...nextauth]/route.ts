@@ -52,11 +52,11 @@ function getClientIp(req: Request): string | null {
 export async function POST(req: Request, ctx: any) {
   if (env.AUTH_EMAIL_RATE_LIMIT > 0) {
     const url = new URL(req.url);
-    if (url.pathname.endsWith("/signin/email")) {
+    if (url.pathname.endsWith("/callback/credentials")) {
       try {
         const ip = getClientIp(req);
         if (!ip) {
-          logger.warn("Auth email rate limit skipped: missing client IP");
+          logger.warn("Auth login rate limit skipped: missing client IP");
           return handler(req, ctx);
         }
         const redis = getRedis();
@@ -65,7 +65,7 @@ export async function POST(req: Request, ctx: any) {
         const count = await redis.incr(key);
         if (count === 1) await redis.expire(key, ttl);
         if (count > env.AUTH_EMAIL_RATE_LIMIT) {
-          logger.warn({ ip }, "Auth email rate limit exceeded");
+          logger.warn({ ip }, "Auth login rate limit exceeded");
           return Response.json(
             {
               error: {
@@ -73,11 +73,11 @@ export async function POST(req: Request, ctx: any) {
                 message: "Too many requests",
               },
             },
-            { status: 429 }
+            { status: 429 },
           );
         }
       } catch (error) {
-        logger.error({ err: error }, "Auth email rate limit failed");
+        logger.error({ err: error }, "Auth login rate limit failed");
       }
     }
   }

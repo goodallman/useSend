@@ -55,8 +55,7 @@ docker run -d \
   -e AWS_ACCESS_KEY_ID="<your-aws-access-key-id>" \
   -e AWS_SECRET_ACCESS_KEY="<your-aws-secret-access-key>" \
   -e AWS_DEFAULT_REGION="<your-aws-region>" \
-  -e GITHUB_ID="<your-github-client-id>" \
-  -e GITHUB_SECRET="<your-github-client-secret>" \
+  -e NOYRA_API_KEY="<your-long-random-noyra-api-key>" \
   usesend/usesend
 ```
 

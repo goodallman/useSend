@@ -1,0 +1,34 @@
+/* The upstream floating menus obscure nearby email content and expose only a
+ * subset of the available controls. Noyra provides a persistent toolbar and
+ * contextual button controls in the composer instead. */
+[data-re-bubble-menu] {
+  display: none !important;
+}
+
+/* The floating-ui wrapper does not forward the data attribute from the menu
+ * itself, so suppress the generated positioned wrapper by its menu content. */
+.noyra-react-email-editor
+  > div[tabindex="0"]:has([data-re-bubble-menu-item]),
+.noyra-react-email-editor > div[tabindex="0"]:has([data-re-btn-bm-item]),
+.noyra-react-email-editor > div[tabindex="0"]:has([data-re-img-bm-item]) {
+  display: none !important;
+}
+
+/* The button node emits an alignment class on its full-width wrapper, but the
+ * upstream theme does not provide styles for those classes in the editor. */
+.noyra-react-email-editor .align-left {
+  text-align: left;
+}
+
+.noyra-react-email-editor .align-center {
+  text-align: center;
+}
+
+.noyra-react-email-editor .align-right {
+  text-align: right;
+}
+
+/* Match the browser defaults used by the generated email preview. */
+.noyra-react-email-editor hr {
+  margin: 0.5em 0;
+}

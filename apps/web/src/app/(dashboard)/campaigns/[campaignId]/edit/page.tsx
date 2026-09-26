@@ -2,9 +2,9 @@
 
 import { api } from "~/trpc/react";
 import { Spinner } from "@usesend/ui/src/spinner";
-import { Button } from "@usesend/ui/src/button";
 import { Input } from "@usesend/ui/src/input";
 import { Editor } from "@usesend/email-editor";
+import { isReactEmailContent } from "@usesend/react-email-editor";
 import { use, useMemo, useState } from "react";
 import { Campaign } from "@prisma/client";
 import {
@@ -13,25 +13,6 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@usesend/ui/src/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@usesend/ui/src/dialog";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@usesend/ui/src/form";
 import { toast } from "@usesend/ui/src/toaster";
 import { useDebouncedCallback } from "use-debounce";
 import { formatDistanceToNow } from "date-fns";
@@ -44,10 +25,7 @@ import {
 import ScheduleCampaign from "../../schedule-campaign";
 import { useRouter } from "next/navigation";
 import { getCampaignEditorVariables } from "~/lib/constants/campaign";
-
-const sendSchema = z.object({
-  confirmation: z.string(),
-});
+import { ReactEmailComposer } from "~/components/react-email-composer";
 
 const IMAGE_SIZE_LIMIT = 10 * 1024 * 1024;
 
@@ -175,9 +153,11 @@ function CampaignEditor({
   const variableSuggestionsHelperText = contactBookId
     ? undefined
     : "Select the contact book for related variable";
+  const useModernEditor =
+    !campaign.content || isReactEmailContent(campaign.content);
 
   return (
-    <div className="p-4 container mx-auto ">
+    <div className="mx-auto w-full max-w-none p-4">
       <div className="mx-auto">
         <div className="mb-4 flex justify-between items-center w-[700px] mx-auto">
           <Input
@@ -439,6 +419,24 @@ function CampaignEditor({
             Email created from API. Campaign content can only be updated via
             API.
           </p>
+        ) : useModernEditor ? (
+          <div className="mx-auto w-full max-w-[90rem] px-2 sm:px-4">
+            <ReactEmailComposer
+              content={campaign.content}
+              html={campaign.html}
+              variables={editorVariables}
+              uploadImage={
+                campaign.imageUploadSupported ? handleFileChange : undefined
+              }
+              onSavingChange={setIsSaving}
+              onSave={async (value) => {
+                await updateCampaignMutation.mutateAsync({
+                  campaignId: campaign.id,
+                  ...value,
+                });
+              }}
+            />
+          </div>
         ) : (
           <div className=" rounded-lg bg-gray-50 w-[700px] mx-auto p-10">
             <div className="w-[600px] mx-auto">

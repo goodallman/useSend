@@ -2,7 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash } from "crypto";
 import { UnsubscribeReason } from "@prisma/client";
 
-const { mockDb, mockTx, mockUpdateContactSubscription } = vi.hoisted(() => {
+const {
+  mockDb,
+  mockQueueAdd,
+  mockRenderReactEmailDocument,
+  mockTx,
+  mockUpdateContactSubscription,
+} = vi.hoisted(() => {
+  const mockQueueAdd = vi.fn();
+  const mockRenderReactEmailDocument = vi.fn();
   const mockTx = {
     campaignEmail: {
       findUnique: vi.fn(),
@@ -28,9 +36,12 @@ const { mockDb, mockTx, mockUpdateContactSubscription } = vi.hoisted(() => {
         findUnique: vi.fn(),
       },
       campaign: {
+        findUnique: vi.fn(),
         update: vi.fn(),
       },
     },
+    mockQueueAdd,
+    mockRenderReactEmailDocument,
     mockUpdateContactSubscription: vi.fn(),
   };
 });
@@ -55,9 +66,13 @@ vi.mock("~/server/service/contact-service", () => ({
 
 vi.mock("bullmq", () => ({
   Queue: class {
-    add = vi.fn();
+    add = mockQueueAdd;
   },
   Worker: class {},
+}));
+
+vi.mock("@usesend/react-email-editor/src/server-renderer", () => ({
+  renderReactEmailDocument: mockRenderReactEmailDocument,
 }));
 
 vi.mock("~/server/redis", () => ({
@@ -92,6 +107,8 @@ vi.mock("~/server/logger/log", () => ({
 }));
 
 import {
+  CampaignBatchService,
+  prepareCampaignHtml,
   recordCampaignContactFailure,
   subscribeContact,
   unsubscribeContact,
@@ -118,6 +135,79 @@ const input = {
   },
   error: new Error("Queue for region ap-southeast-2 not found"),
 };
+
+describe("React Email campaign preparation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders the document inside the React Email content envelope", async () => {
+    const document = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Hello campaign" }],
+        },
+      ],
+    };
+    const campaign = {
+      id: "campaign_1",
+      content: JSON.stringify({
+        editor: "react-email",
+        version: 1,
+        document,
+      }),
+      html: "<html><body></body></html>",
+    };
+    const renderedCampaign = {
+      ...campaign,
+      html: "<html><body>Hello campaign</body></html>",
+    };
+    mockRenderReactEmailDocument.mockResolvedValue({
+      html: renderedCampaign.html,
+      text: "Hello campaign",
+    });
+    mockDb.campaign.update.mockResolvedValue(renderedCampaign);
+
+    const result = await prepareCampaignHtml(campaign as never);
+
+    expect(mockRenderReactEmailDocument).toHaveBeenCalledWith(document);
+    expect(mockDb.campaign.update).toHaveBeenCalledWith({
+      where: { id: campaign.id },
+      data: { html: renderedCampaign.html },
+    });
+    expect(result).toEqual({
+      campaign: renderedCampaign,
+      html: renderedCampaign.html,
+    });
+  });
+});
+
+describe("CampaignBatchService", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses a BullMQ-compatible custom job ID", async () => {
+    mockDb.campaign.findUnique.mockResolvedValue({
+      lastSentAt: null,
+      batchWindowMinutes: 0,
+      status: "SCHEDULED",
+    });
+
+    await CampaignBatchService.queueBatch({
+      campaignId: "campaign_1",
+      teamId: 7,
+    });
+
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "campaign-campaign_1",
+      { campaignId: "campaign_1", teamId: 7 },
+      expect.objectContaining({ jobId: "campaign-batch-campaign_1" }),
+    );
+  });
+});
 
 describe("recordCampaignContactFailure", () => {
   beforeEach(() => {

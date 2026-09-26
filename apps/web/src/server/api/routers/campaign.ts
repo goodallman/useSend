@@ -1,6 +1,7 @@
 import { CampaignStatus, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { EmailRenderer } from "@usesend/email-editor/src/renderer";
+import { parseReactEmailContent } from "@usesend/react-email-editor/src/content-format";
 import { z } from "zod";
 import { env } from "~/env";
 import {
@@ -9,7 +10,6 @@ import {
   campaignProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import { logger } from "~/server/logger/log";
 import { nanoid } from "~/server/nanoid";
 import * as campaignService from "~/server/service/campaign-service";
 import { validateDomainFromEmail } from "~/server/service/domain-service";
@@ -148,9 +148,18 @@ export const campaignRouter = createTRPCRouter({
 
       if (data.content) {
         const jsonContent = data.content ? JSON.parse(data.content) : null;
-
-        const renderer = new EmailRenderer(jsonContent);
-        htmlToSave = await renderer.render();
+        if (parseReactEmailContent(data.content)) {
+          if (typeof htmlInput !== "string") {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "React Email content must include rendered HTML",
+            });
+          }
+          htmlToSave = htmlInput;
+        } else {
+          const renderer = new EmailRenderer(jsonContent);
+          htmlToSave = await renderer.render();
+        }
       } else if (typeof htmlInput === "string") {
         htmlToSave = htmlInput;
       }
@@ -171,12 +180,14 @@ export const campaignRouter = createTRPCRouter({
       return campaign;
     }),
 
-  deleteCampaign: campaignProcedure.mutation(async ({ ctx: { team }, input }) => {
-    return await campaignService.deleteCampaign(input.campaignId, team.id);
-  }),
+  deleteCampaign: campaignProcedure.mutation(
+    async ({ ctx: { team }, input }) => {
+      return await campaignService.deleteCampaign(input.campaignId, team.id);
+    },
+  ),
 
   getCampaign: campaignProcedure.query(async ({ ctx: { db, team }, input }) => {
-    const campaign = await db.campaign.findUnique({
+    let campaign = await db.campaign.findUnique({
       where: { id: input.campaignId, teamId: team.id },
     });
 
@@ -185,6 +196,13 @@ export const campaignRouter = createTRPCRouter({
         code: "BAD_REQUEST",
         message: "Campaign not found",
       });
+    }
+
+    if (
+      parseReactEmailContent(campaign.content) &&
+      !campaignService.hasVisibleEmailBody(campaign.html)
+    ) {
+      campaign = (await campaignService.prepareCampaignHtml(campaign)).campaign;
     }
 
     const imageUploadSupported = isStorageConfigured();

@@ -4,6 +4,7 @@ import { api } from "~/trpc/react";
 import { Spinner } from "@usesend/ui/src/spinner";
 import { Input } from "@usesend/ui/src/input";
 import { Editor } from "@usesend/email-editor";
+import { isReactEmailContent } from "@usesend/react-email-editor";
 import { useState } from "react";
 import { Template } from "@prisma/client";
 import { toast } from "@usesend/ui/src/toaster";
@@ -12,6 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
+import { ReactEmailComposer } from "~/components/react-email-composer";
 const IMAGE_SIZE_LIMIT = 10 * 1024 * 1024;
 
 export default function EditTemplatePage({
@@ -68,6 +70,8 @@ function TemplateEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState(template.name);
   const [subject, setSubject] = useState(template.subject);
+  const useModernEditor =
+    !template.content || isReactEmailContent(template.content);
 
   const updateTemplateMutation = api.template.updateTemplate.useMutation({
     onSuccess: () => {
@@ -117,7 +121,7 @@ function TemplateEditor({
   };
 
   return (
-    <div className="p-4 container mx-auto">
+    <div className="mx-auto w-full max-w-none p-4">
       <div className="mx-auto">
         <div className="mb-4 flex justify-between items-center w-full sm:w-[700px] mx-auto">
           <div className="flex items-center gap-3">
@@ -196,22 +200,42 @@ function TemplateEditor({
           </div>
         </div>
 
-        <div className=" rounded-lg bg-gray-50 w-full sm:w-[700px] mx-auto p-4 sm:p-10">
-          <div className="w-full sm:w-[600px] mx-auto">
-            <Editor
-              initialContent={json}
-              onUpdate={(content) => {
-                setJson(content.getJSON());
-                setIsSaving(true);
-                deboucedUpdateTemplate();
-              }}
+        {useModernEditor ? (
+          <div className="mx-auto w-full max-w-[90rem] px-2 sm:px-4">
+            <ReactEmailComposer
+              content={template.content}
+              html={template.html}
               variables={["email", "firstName", "lastName"]}
               uploadImage={
                 template.imageUploadSupported ? handleFileChange : undefined
               }
+              onSavingChange={setIsSaving}
+              onSave={async (value) => {
+                await updateTemplateMutation.mutateAsync({
+                  templateId: template.id,
+                  ...value,
+                });
+              }}
             />
           </div>
-        </div>
+        ) : (
+          <div className="mx-auto w-full rounded-lg bg-gray-50 p-4 sm:w-[700px] sm:p-10">
+            <div className="mx-auto w-full sm:w-[600px]">
+              <Editor
+                initialContent={json}
+                onUpdate={(content) => {
+                  setJson(content.getJSON());
+                  setIsSaving(true);
+                  deboucedUpdateTemplate();
+                }}
+                variables={["email", "firstName", "lastName"]}
+                uploadImage={
+                  template.imageUploadSupported ? handleFileChange : undefined
+                }
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

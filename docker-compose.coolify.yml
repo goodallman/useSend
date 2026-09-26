@@ -1,0 +1,95 @@
+# documentation: https://github.com/goodallman/useSend/blob/main/docker/COOLIFY.md
+# slogan: Self-hosted email platform with Noyra magic-link authentication.
+# category: communication
+# tags: email,aws-ses,transactional-email
+# port: 3000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: usesend
+      POSTGRES_USER: usesend
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usesend -d usesend"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  usesend:
+    image: ghcr.io/goodallman/usesend:${USESEND_IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+
+      # Coolify creates the public URL and routes it to container port 3000.
+      SERVICE_URL_USESEND_3000: ${SERVICE_URL_USESEND_3000}
+      NEXTAUTH_URL: ${SERVICE_URL_USESEND_3000}
+      NEXTAUTH_SECRET: ${SERVICE_REALBASE64_64_NEXTAUTH}
+
+      DATABASE_URL: postgresql://usesend:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/usesend
+      REDIS_URL: redis://redis:6379
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-usesend}
+
+      # Coolify generates this value. Copy SERVICE_HEX_64_NOYRA from the
+      # Coolify environment view to the external Noyra service.
+      NOYRA_API_KEY: ${SERVICE_HEX_64_NOYRA}
+
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?}
+
+      NEXT_PUBLIC_IS_CLOUD: "false"
+      API_RATE_LIMIT: ${API_RATE_LIMIT:-1}
+      AUTH_EMAIL_RATE_LIMIT: ${AUTH_EMAIL_RATE_LIMIT:-5}
+
+      SMTP_HOST: ${SMTP_HOST:-smtp.usesend.com}
+      SMTP_USER: ${SMTP_USER:-usesend}
+      FROM_EMAIL: ${FROM_EMAIL:-}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://127.0.0.1:3000/api/health || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  postgres-data:
+  redis-data:

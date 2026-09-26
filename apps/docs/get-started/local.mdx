@@ -109,27 +109,16 @@ ln -s ../../.env apps/web/.env
 ```
 
   </Step>
-  <Step title="Setup GitHub Oauth (optional)">
-  <Note>
-    You don't need this setup if you have `FROM_EMAIL` set in your environment
-    variables. for development email link will logged in the console.
-  </Note>
+  <Step title="Configure account provisioning">
+Generate a long random value for `NOYRA_API_KEY`. Accounts are created by
+calling `POST /api/noyra/accounts` with this value as a Bearer token. The
+response contains a 10-minute, single-use magic link. Use
+`POST /api/noyra/login-links` to issue another link for an existing account.
+There is no public registration flow and no login email is sent.
 
-Next, [create a new GitHub App](https://github.com/settings/applications/new). This will allow you to sign in to useSend with your GitHub account.
-
-Add the homepage as:
-
+```env
+NOYRA_API_KEY="<your-long-random-noyra-api-key>"
 ```
-http://localhost:3000/login
-```
-
-and callback URL as:
-
-```
-http://localhost:3000/api/auth/callback/github
-```
-
-Once the app is added you can add the Client ID under `GITHUB_ID`and CLIENT SECRET under `GITHUB_SECRET`
 
   </Step>
   <Step title="Setup AWS credentials (Optional)">

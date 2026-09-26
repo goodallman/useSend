@@ -9,6 +9,16 @@ import { Fragment, Slice, Node } from "@tiptap/pm/model";
 
 import { EditorView } from "@tiptap/pm/view";
 
+type DragHandleEditorView = Pick<
+  EditorView,
+  | "dispatch"
+  | "dragging"
+  | "focus"
+  | "posAtCoords"
+  | "serializeForClipboard"
+  | "state"
+>;
+
 export interface GlobalDragHandleOptions {
   /**
    * The width of the drag handle
@@ -64,15 +74,15 @@ function nodeDOMAtCoords(coords: { x: number; y: number }) {
             "pre",
             "blockquote",
             "h1, h2, h3, h4, h5, h6",
-          ].join(", ")
-        )
+          ].join(", "),
+        ),
     );
 }
 
 function nodePosAtDOM(
   node: Element,
-  view: EditorView,
-  options: GlobalDragHandleOptions
+  view: DragHandleEditorView,
+  options: GlobalDragHandleOptions,
 ) {
   const boundingRect = node.getBoundingClientRect();
 
@@ -82,17 +92,17 @@ function nodePosAtDOM(
   })?.inside;
 }
 
-function calcNodePos(pos: number, view: EditorView) {
+function calcNodePos(pos: number, view: DragHandleEditorView) {
   const $pos = view.state.doc.resolve(pos);
   if ($pos.depth > 1) return $pos.before($pos.depth);
   return pos;
 }
 
 export function DragHandlePlugin(
-  options: GlobalDragHandleOptions & { pluginKey: string }
+  options: GlobalDragHandleOptions & { pluginKey: string },
 ) {
   let listType = "";
-  function handleDragStart(event: DragEvent, view: EditorView) {
+  function handleDragStart(event: DragEvent, view: DragHandleEditorView) {
     view.focus();
 
     if (!event.dataTransfer) return;
@@ -121,7 +131,7 @@ export function DragHandlePlugin(
     else {
       const nodeSelection = NodeSelection.create(
         view.state.doc,
-        nodePos.before()
+        nodePos.before(),
       );
 
       // Check if the node where the drag event started is part of the current selection
@@ -140,7 +150,7 @@ export function DragHandlePlugin(
       selection = TextSelection.create(
         view.state.doc,
         draggedNodePos,
-        endSelection.$to.pos
+        endSelection.$to.pos,
       );
     } else {
       selection = NodeSelection.create(view.state.doc, draggedNodePos);
@@ -239,7 +249,7 @@ export function DragHandlePlugin(
       }
       view?.dom?.parentElement?.parentElement?.addEventListener(
         "mouseleave",
-        hideHandleOnEditorOut
+        hideHandleOnEditorOut,
       );
 
       return {
@@ -250,12 +260,12 @@ export function DragHandlePlugin(
           dragHandleElement?.removeEventListener("drag", onDragHandleDrag);
           dragHandleElement?.removeEventListener(
             "dragstart",
-            onDragHandleDragStart
+            onDragHandleDragStart,
           );
           dragHandleElement = null;
           view?.dom?.parentElement?.parentElement?.removeEventListener(
             "mouseleave",
-            hideHandleOnEditorOut
+            hideHandleOnEditorOut,
           );
         },
       };
@@ -349,7 +359,7 @@ export function DragHandlePlugin(
           ) {
             const newList = view.state.schema.nodes.orderedList?.createAndFill(
               null,
-              droppedNode
+              droppedNode,
             );
             const slice = new Slice(Fragment.from(newList), 0, 0);
             view.dragging = { slice, move: event.ctrlKey };

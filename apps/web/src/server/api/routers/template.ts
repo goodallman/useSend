@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { EmailRenderer } from "@usesend/email-editor/src/renderer";
+import { parseReactEmailContent } from "@usesend/react-email-editor/src/content-format";
 import { z } from "zod";
 import { env } from "~/env";
 import {
@@ -78,17 +79,29 @@ export const templateRouter = createTRPCRouter({
         name: z.string().optional(),
         subject: z.string().optional(),
         content: z.string().optional(),
+        html: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx: { db }, input }) => {
-      const { templateId, ...data } = input;
+      const { templateId, html: htmlInput, ...data } = input;
       let html: string | null = null;
 
       if (data.content) {
         const jsonContent = data.content ? JSON.parse(data.content) : null;
-
-        const renderer = new EmailRenderer(jsonContent);
-        html = await renderer.render();
+        if (parseReactEmailContent(data.content)) {
+          if (typeof htmlInput !== "string") {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "React Email content must include rendered HTML",
+            });
+          }
+          html = htmlInput;
+        } else {
+          const renderer = new EmailRenderer(jsonContent);
+          html = await renderer.render();
+        }
+      } else if (typeof htmlInput === "string") {
+        html = htmlInput;
       }
 
       const template = await db.template.update({
@@ -131,12 +144,13 @@ export const templateRouter = createTRPCRouter({
   }),
 
   duplicateTemplate: templateProcedure.mutation(
-    async ({ ctx: { db, team, template }, input }) => {
+    async ({ ctx: { db, team, template } }) => {
       const newTemplate = await db.template.create({
         data: {
           name: `${template.name} (Copy)`,
           subject: template.subject,
           content: template.content,
+          html: template.html,
           teamId: team.id,
         },
       });

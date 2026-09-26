@@ -3,7 +3,6 @@
 import {
   BookUser,
   Code,
-  Cog,
   MessageSquare,
   Globe,
   LayoutTemplate,
@@ -14,8 +13,6 @@ import {
   BarChart3,
   LogOutIcon,
   MoreVerticalIcon,
-  UsersIcon,
-  GaugeIcon,
   UserRoundX,
   Webhook,
 } from "lucide-react";
@@ -35,9 +32,9 @@ import {
   useSidebar,
 } from "@usesend/ui/src/sidebar";
 import Link from "next/link";
-import { MiniThemeSwitcher, ThemeSwitcher } from "./theme/ThemeSwitcher";
+import { ThemeSwitcher } from "./theme/ThemeSwitcher";
 import { useSession } from "next-auth/react";
-import { isCloud, isSelfHosted } from "~/utils/common";
+import { isCloud } from "~/utils/common";
 import { usePathname } from "next/navigation";
 import { Badge } from "@usesend/ui/src/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@usesend/ui/src/avatar";
@@ -52,7 +49,6 @@ import {
   DropdownMenuTrigger,
 } from "@usesend/ui/src/dropdown-menu";
 import { FeedbackDialog } from "./FeedbackDialog";
-import { env } from "~/env";
 
 // General items
 const generalItems = [
@@ -110,17 +106,10 @@ const settingsItems = [
     icon: Code,
   },
   {
-    title: "Settings",
-    url: "/settings",
-    icon: Cog,
-  },
-  // Admin item shows if user is admin OR if it's self-hosted
-  {
     title: "Admin",
     url: "/admin",
     icon: Server,
     isAdmin: true,
-    isSelfHosted: true,
   },
 ];
 
@@ -205,20 +194,8 @@ export function AppSidebar() {
               {settingsItems.map((item) => {
                 const isActive = pathname?.startsWith(item.url);
 
-                // Special case for Admin item: show if user is admin OR if it's self-hosted
-                if (item.isAdmin && item.isSelfHosted) {
-                  if (!session?.user.isAdmin && !isSelfHosted()) {
-                    return null;
-                  }
-                } else {
-                  // Regular admin-only items
-                  if (item.isAdmin && !session?.user.isAdmin) {
-                    return null;
-                  }
-                  // Regular self-hosted-only items
-                  if (item.isSelfHosted && !isSelfHosted()) {
-                    return null;
-                  }
+                if (item.isAdmin && !session?.user.isAdmin) {
+                  return null;
                 }
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -264,7 +241,6 @@ export function AppSidebar() {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
-        {isSelfHosted() && <VersionInfo />}
         <NavUser
           user={{
             name:
@@ -352,18 +328,6 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem asChild>
-                <Link href="/settings/team">
-                  <UsersIcon />
-                  Team
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings">
-                  <GaugeIcon />
-                  Usage
-                </Link>
-              </DropdownMenuItem>
               <div className="px-2 py-0.5">
                 <ThemeSwitcher />
               </div>
@@ -377,35 +341,5 @@ export function NavUser({
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  );
-}
-
-function VersionInfo() {
-  const appVersion = env.NEXT_PUBLIC_APP_VERSION;
-  const gitSha = env.NEXT_PUBLIC_GIT_SHA;
-
-  // If no version info available, don't render anything
-  if (!appVersion && !gitSha) {
-    return null;
-  }
-
-  const displayVersion =
-    appVersion && appVersion !== "unknown"
-      ? appVersion
-      : gitSha && gitSha !== "unknown"
-        ? gitSha.substring(0, 7)
-        : null;
-
-  if (!displayVersion) {
-    return null;
-  }
-
-  return (
-    <div className="px-2 py-2 text-xs text-muted-foreground">
-      <div className="flex items-center justify-between">
-        <span>Version</span>
-        <span className="font-mono">{displayVersion}</span>
-      </div>
-    </div>
   );
 }

@@ -5,7 +5,6 @@ description: "An end-to-end guide on how to self-host useSend. An open-source se
 
 ## Prerequisites
 
-- A [GitHub](https://github.com) account
 - An [AWS](https://aws.amazon.com) account
 
 If you have any questions join [#self-host](https://discord.gg/gbsvjb9MqV) on discord.
@@ -31,23 +30,28 @@ Add the following environment variables.
 </Tip>
 
   </Step>
-  <Step title="GitHub app credentials for login">
-  useSend uses GitHub authentication for login.
-
-Use this link to [create an github app](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/about-creating-github-apps)
-
-Callback URL : `https://<your-usesend-instance>/api/auth/callback/github`
-
-![github app](/images/github-callback.png)
-
-Add the following environment variables.
+  <Step title="Account provisioning key">
+useSend uses one-time magic links supplied by Noyra and does not expose public
+registration or send login emails. Create a long random secret for the Noyra
+account endpoints.
 
 ```env
-GITHUB_ID="<your-github-client-id>"
-GITHUB_SECRET="<your-github-client-secret>"
+NOYRA_API_KEY="<your-long-random-noyra-api-key>"
 ```
 
-  <Info>If you want email/password login, please help us out with the [code](https://github.com/usesend/usesend) </Info>  
+Create accounts with `POST /api/noyra/accounts`, or issue a fresh link for an
+existing account with `POST /api/noyra/login-links`. Both endpoints require an
+`Authorization: Bearer <NOYRA_API_KEY>` header and return a single-use magic
+link that expires after 10 minutes.
+
+```json
+{
+  "email": "user@example.com",
+  "name": "Example User",
+  "redirectTo": "/dashboard"
+}
+```
+
   </Step>
   <Step title="Database & Redis">
   useSend uses Postgres as a database and Redis as a queue. You need to create a new database and add the following environment variables.

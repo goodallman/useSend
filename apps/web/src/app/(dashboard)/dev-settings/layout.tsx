@@ -15,7 +15,11 @@ export default function ApiKeysPage({
       <H1>Developer Settings</H1>
       <div className="flex gap-4 mt-4">
         <SettingsNavButton href="/dev-settings">API Keys</SettingsNavButton>
-        <SettingsNavButton href="/dev-settings/smtp">SMTP</SettingsNavButton>
+        {process.env.NODE_ENV === "development" ? (
+          <SettingsNavButton href="/dev-settings/editor-lab">
+            Email Editor Lab
+          </SettingsNavButton>
+        ) : null}
       </div>
       <div className="mt-8">{children}</div>
     </div>
