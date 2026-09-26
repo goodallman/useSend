@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   authorizationStatus: vi.fn(),
   findTeam: vi.fn(),
   countEmail: vi.fn(),
+  dailyEmail: vi.fn(),
 }));
 
 vi.mock("~/server/noyra-api-auth", () => ({
@@ -13,6 +14,7 @@ vi.mock("~/server/db", () => ({
   db: {
     team: { findUnique: mocks.findTeam },
     email: { count: mocks.countEmail },
+    $queryRaw: mocks.dailyEmail,
   },
 }));
 
@@ -30,6 +32,7 @@ describe("Noyra workspace usage", () => {
     mocks.authorizationStatus.mockReturnValue("authorized");
     mocks.findTeam.mockResolvedValue({ id: 42 });
     mocks.countEmail.mockResolvedValue(17);
+    mocks.dailyEmail.mockResolvedValue([]);
   });
 
   it("rejects requests without Noyra authorization", async () => {
@@ -71,5 +74,29 @@ describe("Noyra workspace usage", () => {
     const response = await GET(request(), { params: Promise.resolve({ workspaceId: "ws-1" }) });
     expect(response.status).toBe(404);
     expect(mocks.countEmail).not.toHaveBeenCalled();
+  });
+
+  it("reports daily sent-email history for the mapped team without changing the count contract", async () => {
+    mocks.dailyEmail.mockResolvedValue([
+      { day: new Date("2026-09-02T00:00:00.000Z"), sent: 3 },
+      { day: new Date("2026-09-05T00:00:00.000Z"), sent: 2 },
+    ]);
+    const response = await GET(new Request(`${request().url}&daily=true`, {
+      headers: { Authorization: "Bearer noyra-secret" },
+    }), { params: Promise.resolve({ workspaceId: "ws-1" }) });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      workspaceId: "ws-1", teamId: 42, from: "2026-09-01T00:00:00.000Z", to: "2026-10-01T00:00:00.000Z",
+      sent: 5,
+      daily: [
+        { day: "2026-09-02T00:00:00.000Z", sent: 3 },
+        { day: "2026-09-05T00:00:00.000Z", sent: 2 },
+      ],
+    });
+    expect(mocks.countEmail).not.toHaveBeenCalled();
+    expect(mocks.dailyEmail).toHaveBeenCalledOnce();
+    expect(mocks.dailyEmail.mock.calls[0]?.[0].values).toEqual([
+      42, new Date("2026-09-01T00:00:00.000Z"), new Date("2026-10-01T00:00:00.000Z"),
+    ]);
   });
 });
