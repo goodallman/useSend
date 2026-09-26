@@ -167,6 +167,15 @@ it.each([
       ],
     },
   ],
+  [
+    "quote",
+    {
+      type: "blockquote",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Hello" }] },
+      ],
+    },
+  ],
 ] as const)("splits text inside %s on Enter", async (_name, block) => {
   const host = document.createElement("div");
   document.body.append(host);
@@ -232,6 +241,14 @@ it.each([
     );
   });
   expect(countBlocks(editor!.getDocument().content ?? [])).toBe(before + 1);
+  if (_name === "heading") {
+    expect(
+      editor!
+        .getDocument()
+        .content?.[0]?.content?.slice(0, 2)
+        .map((node) => node.type),
+    ).toEqual(["heading", "paragraph"]);
+  }
 });
 
 it("treats a selected layout as a block rather than selected text", async () => {
@@ -289,7 +306,7 @@ it("treats a selected layout as a block rather than selected text", async () => 
   expect(states.at(-1)?.hasTextSelection).toBe(false);
 });
 
-it("splits an empty paragraph when another shortcut consumes Enter", async () => {
+it("splits an empty paragraph even when another shortcut would consume Enter", async () => {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -340,7 +357,7 @@ it("splits an empty paragraph when another shortcut consumes Enter", async () =>
   expect(content.querySelectorAll("p")).toHaveLength(3);
 });
 
-it("keeps list structure when the Enter fallback runs", async () => {
+it("keeps list structure when Enter is handled directly", async () => {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -405,4 +422,51 @@ it("keeps list structure when the Enter fallback runs", async () => {
   });
 
   expect(content.querySelectorAll("li")).toHaveLength(2);
+});
+
+it("exits a list when Enter is pressed in an empty item", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  mounted.push(() => {
+    act(() => root.unmount());
+    host.remove();
+  });
+  let editor: ReactEmailEditorRef | null = null;
+
+  await act(async () => {
+    root.render(
+      React.createElement(ReactEmailEditor, {
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "bulletList",
+              content: [{ type: "listItem", content: [{ type: "paragraph" }] }],
+            },
+          ],
+        },
+        onReady: (value) => {
+          editor = value;
+        },
+      }),
+    );
+  });
+  await vi.waitFor(() => expect(editor).not.toBeNull());
+  const content = host.querySelector<HTMLElement>(".tiptap")!;
+  await act(async () => {
+    content.focus();
+    window.getSelection()!.collapse(content.querySelector("li p")!, 0);
+    content.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        code: "Enter",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+
+  expect(content.querySelectorAll("li")).toHaveLength(0);
+  expect(content.querySelectorAll("p").length).toBeGreaterThan(0);
 });

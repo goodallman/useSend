@@ -689,7 +689,7 @@ export const ReactEmailEditor = forwardRef<
     ref.editor?.on("selectionUpdate", notifySelection);
     ref.editor?.on("update", notifySelection);
     const editorElement = ref.editor?.view.dom;
-    const restoreUnhandledEnter = (event: KeyboardEvent) => {
+    const handleTextBlockEnter = (event: KeyboardEvent) => {
       if (
         event.key !== "Enter" ||
         event.shiftKey ||
@@ -697,36 +697,31 @@ export const ReactEmailEditor = forwardRef<
         event.ctrlKey ||
         event.metaKey ||
         event.isComposing ||
-        !ref.editor?.isFocused
+        !ref.editor?.isFocused ||
+        editorElement?.ownerDocument.querySelector("[data-re-slash-command]")
       ) {
         return;
       }
 
       const editor = ref.editor;
-      const { doc, selection } = editor.state;
+      const { selection } = editor.state;
       if (!selection.$from.parent.isTextblock) return;
 
-      // Some upstream shortcuts consume Enter without changing the document.
-      // Let them run first, then split only if neither content nor cursor moved.
-      queueMicrotask(() => {
-        if (
-          editor.isDestroyed ||
-          !editor.isFocused ||
-          !editor.state.doc.eq(doc) ||
-          !editor.state.selection.eq(selection)
-        ) {
-          return;
-        }
-
-        const inListItem =
-          selection.$from.node(selection.$from.depth - 1)?.type.name ===
-          "listItem";
-        if (inListItem && editor.can().splitListItem("listItem")) {
-          editor.commands.splitListItem("listItem");
-        } else {
-          editor.commands.splitBlock();
-        }
-      });
+      const inListItem =
+        selection.$from.node(selection.$from.depth - 1)?.type.name ===
+        "listItem";
+      const handled =
+        inListItem &&
+        selection.$from.parent.content.size === 0 &&
+        editor.can().liftListItem("listItem")
+          ? editor.commands.liftListItem("listItem")
+          : inListItem && editor.can().splitListItem("listItem")
+            ? editor.commands.splitListItem("listItem")
+            : editor.commands.splitBlock();
+      if (handled) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
     };
     const selectClickedButton = (event: Event) => {
       const target = event.target;
@@ -786,18 +781,14 @@ export const ReactEmailEditor = forwardRef<
       event.preventDefault();
       ref.editor.chain().focus().setNodeSelection(buttonPosition).run();
     };
-    editorElement?.addEventListener("keydown", restoreUnhandledEnter, true);
+    editorElement?.addEventListener("keydown", handleTextBlockEnter, true);
     editorElement?.addEventListener("pointerdown", selectClickedButton, true);
     editorElement?.addEventListener("mousedown", selectClickedButton, true);
     editorElement?.addEventListener("click", selectClickedButton, true);
     selectionCleanupRef.current = () => {
       ref.editor?.off("selectionUpdate", notifySelection);
       ref.editor?.off("update", notifySelection);
-      editorElement?.removeEventListener(
-        "keydown",
-        restoreUnhandledEnter,
-        true,
-      );
+      editorElement?.removeEventListener("keydown", handleTextBlockEnter, true);
       editorElement?.removeEventListener(
         "pointerdown",
         selectClickedButton,
