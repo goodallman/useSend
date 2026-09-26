@@ -697,7 +697,7 @@ export const ReactEmailEditor = forwardRef<
         event.ctrlKey ||
         event.metaKey ||
         event.isComposing ||
-        !ref.editor?.isFocused ||
+        !ref.editor ||
         editorElement?.ownerDocument.querySelector("[data-re-slash-command]")
       ) {
         return;
@@ -706,11 +706,12 @@ export const ReactEmailEditor = forwardRef<
       const editor = ref.editor;
       const { selection } = editor.state;
       if (!selection.$from.parent.isTextblock) return;
+      const before = editor.state.doc;
 
       const inListItem =
         selection.$from.node(selection.$from.depth - 1)?.type.name ===
         "listItem";
-      const handled =
+      let handled =
         inListItem &&
         selection.$from.parent.content.size === 0 &&
         editor.can().liftListItem("listItem")
@@ -718,6 +719,16 @@ export const ReactEmailEditor = forwardRef<
           : inListItem && editor.can().splitListItem("listItem")
             ? editor.commands.splitListItem("listItem")
             : editor.commands.splitBlock();
+      if (!handled || editor.state.doc.eq(before)) {
+        handled =
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(selection.$from.after(selection.$from.depth), {
+              type: "paragraph",
+            })
+            .run() || handled;
+      }
       if (handled) {
         event.preventDefault();
         event.stopImmediatePropagation();
