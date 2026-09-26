@@ -81,6 +81,8 @@ export interface ReactEmailEditorRef {
   insertButton: () => void;
   insertDivider: () => void;
   // eslint-disable-next-line no-unused-vars
+  insertLayout: (type: ReactEmailLayoutType) => void;
+  // eslint-disable-next-line no-unused-vars
   toggleBlock: (type: "bulletList" | "orderedList" | "blockquote") => void;
   selectLayoutBlock: () => void;
   deleteSelectedBlock: () => void;
@@ -224,7 +226,8 @@ function getEditorState(editor: EditorInstance): ReactEmailEditorState {
       underline: editor.isActive("underline"),
       strike: editor.isActive("strike"),
     },
-    hasTextSelection: !editor.state.selection.empty,
+    hasTextSelection:
+      !editor.state.selection.empty && !("node" in editor.state.selection),
     linkHref: String(editor.getAttributes("link").href ?? ""),
     button: activeButton
       ? {
@@ -359,6 +362,34 @@ function toPublicRef(
         .insertContentAt(position, {
           type: "horizontalRule",
         })
+        .run();
+    },
+    insertLayout: (type) => {
+      const editor = getRef()?.editor;
+      if (!editor) return;
+      recordAction(editor);
+      const position = getBlockInsertionPosition(editor);
+      const emptyParagraph = { type: "paragraph" };
+      const columnCount = {
+        twoColumns: 2,
+        threeColumns: 3,
+        fourColumns: 4,
+      }[type as "twoColumns" | "threeColumns" | "fourColumns"];
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(
+          position,
+          type === "section"
+            ? { type, content: [emptyParagraph] }
+            : {
+                type,
+                content: Array.from({ length: columnCount }, () => ({
+                  type: "columnsColumn",
+                  content: [emptyParagraph],
+                })),
+              },
+        )
         .run();
     },
     toggleBlock: (type) => {

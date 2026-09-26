@@ -226,7 +226,10 @@ export function ReactEmailComposer({
 
   const handleEditorSelectionChange = (next: ReactEmailEditorState) => {
     setEditorState(next);
-    if (next.button) {
+    if (next.selectedBlock?.isSelected) {
+      setSelectedButton(null);
+      setLinkPanelOpen(false);
+    } else if (next.button) {
       setSelectedButton(next.button);
       setLinkPanelOpen(false);
     } else if (next.hasTextSelection) {
@@ -513,6 +516,39 @@ export function ReactEmailComposer({
               ))}
 
               <span className="mx-1 h-5 w-px bg-border" />
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={disabled}
+                  >
+                    Layout <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {(
+                    [
+                      ["section", "Section"],
+                      ["twoColumns", "2 columns"],
+                      ["threeColumns", "3 columns"],
+                      ["fourColumns", "4 columns"],
+                    ] as const
+                  ).map(([type, label]) => (
+                    <DropdownMenuItem
+                      key={type}
+                      onSelect={() =>
+                        runEditorAction((editor) => editor.insertLayout(type))
+                      }
+                    >
+                      {label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               {(
                 [

@@ -5,13 +5,26 @@
   display: none !important;
 }
 
+[data-re-link-bm-toolbar],
+[data-re-link-bm-form] {
+  display: none !important;
+}
+
 /* The floating-ui wrapper does not forward the data attribute from the menu
  * itself, so suppress the generated positioned wrapper by its menu content. */
-.noyra-react-email-editor
-  > div[tabindex="0"]:has([data-re-bubble-menu-item]),
+.noyra-react-email-editor > div[tabindex="0"]:has([data-re-bubble-menu-item]),
 .noyra-react-email-editor > div[tabindex="0"]:has([data-re-btn-bm-item]),
 .noyra-react-email-editor > div[tabindex="0"]:has([data-re-img-bm-item]) {
   display: none !important;
+}
+
+.noyra-react-email-editor > div[tabindex="0"]:has([data-re-link-bm-item]) {
+  display: none !important;
+}
+
+.noyra-react-email-editor .tiptap {
+  min-height: 560px !important;
+  cursor: text;
 }
 
 /* The button node emits an alignment class on its full-width wrapper, but the
@@ -33,10 +46,20 @@
   margin: 0.5em 0;
 }
 
-.noyra-react-email-editor .node-section:hover,
-.noyra-react-email-editor .node-columns:hover {
-  outline: 1px dashed var(--re-text-muted);
-  outline-offset: 3px;
+.noyra-react-email-editor .node-section,
+.noyra-react-email-editor .node-columns {
+  min-height: 88px;
+  outline: 1px dashed #94a3b8;
+  outline-offset: 2px;
+  padding: 8px;
+  margin: 10px 0;
+}
+
+.noyra-react-email-editor .node-column {
+  min-height: 68px;
+  outline: 1px dashed #cbd5e1;
+  outline-offset: -2px;
+  padding: 6px;
 }
 
 .noyra-react-email-editor .node-section.ProseMirror-selectednode,
