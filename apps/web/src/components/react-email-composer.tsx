@@ -40,6 +40,8 @@ import {
   Eye,
   Italic,
   Link2,
+  List,
+  ListOrdered,
   Minus,
   Monitor,
   MousePointer2,
@@ -48,9 +50,12 @@ import {
   Redo2,
   Smartphone,
   Strikethrough,
+  TextQuote,
   Trash2,
   Underline,
   Undo2,
+  ArrowDown,
+  ArrowUp,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -79,6 +84,7 @@ const initialEditorState: ReactEmailEditorState = {
   hasTextSelection: false,
   linkHref: "",
   button: null,
+  selectedBlock: null,
 };
 
 function patchInlineStyle(
@@ -326,7 +332,10 @@ export function ReactEmailComposer({
     }
   };
   const hasContextPanel =
-    mode === "visual" && (linkPanelOpen || Boolean(selectedButton));
+    mode === "visual" &&
+    (linkPanelOpen ||
+      Boolean(selectedButton) ||
+      Boolean(editorState.selectedBlock));
 
   return (
     <Tabs value={mode} onValueChange={changeMode}>
@@ -507,6 +516,33 @@ export function ReactEmailComposer({
 
               {(
                 [
+                  ["bulletList", List, "Bulleted list"],
+                  ["orderedList", ListOrdered, "Numbered list"],
+                  ["blockquote", TextQuote, "Quote"],
+                ] as const
+              ).map(([block, Icon, label]) => (
+                <Button
+                  key={block}
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 px-0"
+                  disabled={disabled || Boolean(selectedButton)}
+                  aria-label={label}
+                  title={label}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() =>
+                    runEditorAction((editor) => editor.toggleBlock(block))
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                </Button>
+              ))}
+
+              <span className="mx-1 h-5 w-px bg-border" />
+
+              {(
+                [
                   ["left", AlignLeft, "Align left"],
                   ["center", AlignCenter, "Align center"],
                   ["right", AlignRight, "Align right"],
@@ -665,9 +701,7 @@ export function ReactEmailComposer({
             ) : null}
 
             {selectedButton ? (
-              <div
-                className="border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[680px] lg:border-b-0 lg:border-l lg:p-5"
-              >
+              <div className="border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[680px] lg:border-b-0 lg:border-l lg:p-5">
                 <div className="mb-2">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-medium">Button settings</p>
@@ -844,6 +878,99 @@ export function ReactEmailComposer({
               </div>
             ) : null}
 
+            {editorState.selectedBlock && !selectedButton && !linkPanelOpen ? (
+              <div className="flex flex-col gap-3 border-b bg-blue-50/70 px-3 py-3 text-slate-900 dark:bg-blue-950/20 dark:text-foreground sm:px-4 lg:col-start-2 lg:row-start-3 lg:min-h-[680px] lg:border-b-0 lg:border-l lg:p-5">
+                <div>
+                  <p className="text-sm font-medium">
+                    {editorState.selectedBlock.type === "horizontalRule"
+                      ? "Divider"
+                      : editorState.selectedBlock.type === "section"
+                        ? "Section"
+                        : "Columns"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {editorState.selectedBlock.type === "horizontalRule"
+                      ? "Move or delete this divider."
+                      : editorState.selectedBlock.isSelected
+                        ? "Moving keeps all content inside. Deleting removes the entire layout and its content."
+                        : "Select the whole layout before moving or deleting it. Text inside remains editable."}
+                  </p>
+                </div>
+                {!editorState.selectedBlock.isSelected ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={disabled}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => editorRef.current?.selectLayoutBlock()}
+                  >
+                    Select{" "}
+                    {editorState.selectedBlock.type === "section"
+                      ? "section"
+                      : "columns"}
+                  </Button>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          disabled || !editorState.selectedBlock.canMoveUp
+                        }
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() =>
+                          runEditorAction((editor) =>
+                            editor.moveSelectedBlock("up"),
+                          )
+                        }
+                      >
+                        <ArrowUp className="mr-1 h-4 w-4" /> Move up
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          disabled || !editorState.selectedBlock.canMoveDown
+                        }
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() =>
+                          runEditorAction((editor) =>
+                            editor.moveSelectedBlock("down"),
+                          )
+                        }
+                      >
+                        <ArrowDown className="mr-1 h-4 w-4" /> Move down
+                      </Button>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      disabled={disabled}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() =>
+                        runEditorAction((editor) =>
+                          editor.deleteSelectedBlock(),
+                        )
+                      }
+                    >
+                      <Trash2 className="mr-1.5 h-4 w-4" /> Delete{" "}
+                      {editorState.selectedBlock.type === "horizontalRule"
+                        ? "divider"
+                        : editorState.selectedBlock.type === "section"
+                          ? "section and contents"
+                          : "columns and contents"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            ) : null}
+
             {!hasContextPanel ? (
               <div className="hidden min-h-[680px] border-l bg-muted/10 p-5 lg:col-start-2 lg:row-start-3 lg:block">
                 <div className="flex items-start gap-2 text-muted-foreground">
@@ -853,7 +980,8 @@ export function ReactEmailComposer({
                       Content settings
                     </p>
                     <p className="mt-1 text-xs leading-relaxed">
-                      Select text, a link, or a button to edit its settings here.
+                      Select text, a link, or a button to edit its settings
+                      here.
                     </p>
                   </div>
                 </div>

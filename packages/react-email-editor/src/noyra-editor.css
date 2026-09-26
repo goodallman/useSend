@@ -32,3 +32,16 @@
 .noyra-react-email-editor hr {
   margin: 0.5em 0;
 }
+
+.noyra-react-email-editor .node-section:hover,
+.noyra-react-email-editor .node-columns:hover {
+  outline: 1px dashed var(--re-text-muted);
+  outline-offset: 3px;
+}
+
+.noyra-react-email-editor .node-section.ProseMirror-selectednode,
+.noyra-react-email-editor .node-columns.ProseMirror-selectednode,
+.noyra-react-email-editor .ProseMirror-selectednode:has(> hr.node-hr) {
+  outline: 2px solid var(--re-text);
+  outline-offset: 3px;
+}
