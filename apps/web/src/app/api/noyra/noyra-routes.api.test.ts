@@ -141,10 +141,25 @@ describe("Noyra account routes", () => {
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({ teamId: 42 });
     expect(mocks.ensureWorkspaceTeam).toHaveBeenCalledWith(
-      7, "workspace-1", "First workspace", expect.anything(), false,
+      7, "workspace-1", "First workspace", expect.anything(), false, false,
     );
     expect(mocks.createMagicLoginLink).toHaveBeenCalledWith(
       7, undefined, expect.anything(), 42,
+    );
+  });
+
+  it("forwards strict legacy matching when provisioning a tracked workspace", async () => {
+    const response = await createAccount(post("/api/noyra/accounts", {
+      email: "user@example.com",
+      workspaceId: "workspace-1",
+      workspaceName: "EpicWave",
+      adoptLegacyTeam: true,
+      requireLegacyNameMatch: true,
+    }));
+
+    expect(response.status).toBe(201);
+    expect(mocks.ensureWorkspaceTeam).toHaveBeenCalledWith(
+      7, "workspace-1", "EpicWave", expect.anything(), true, true,
     );
   });
 
@@ -190,7 +205,7 @@ describe("Noyra account routes", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ teamId: 42 });
     expect(mocks.ensureWorkspaceTeam).toHaveBeenCalledWith(
-      7, "workspace-2", "Second workspace", expect.anything(), false,
+      7, "workspace-2", "Second workspace", expect.anything(), false, false,
     );
     expect(mocks.createMagicLoginLink).toHaveBeenCalledWith(7, undefined, expect.anything(), 42);
   });
@@ -206,7 +221,23 @@ describe("Noyra account routes", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.ensureWorkspaceTeam).toHaveBeenCalledWith(
-      7, "workspace-1", "Existing workspace", expect.anything(), true,
+      7, "workspace-1", "Existing workspace", expect.anything(), true, false,
+    );
+  });
+
+  it("requires a name match when linking a tracked account with multiple workspaces", async () => {
+    mocks.userFindFirst.mockResolvedValue({ id: 7, email: "user@example.com", name: "User" });
+    const response = await createLoginLink(post("/api/noyra/login-links", {
+      email: "user@example.com",
+      workspaceId: "workspace-1",
+      workspaceName: "EpicWave",
+      adoptLegacyTeam: true,
+      requireLegacyNameMatch: true,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.ensureWorkspaceTeam).toHaveBeenCalledWith(
+      7, "workspace-1", "EpicWave", expect.anything(), true, true,
     );
   });
 });

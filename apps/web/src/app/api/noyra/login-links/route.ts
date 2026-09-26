@@ -17,6 +17,7 @@ const createLoginLinkSchema = z.object({
   workspaceId: z.string().trim().min(1).max(200).optional(),
   workspaceName: z.string().trim().min(1).max(100).optional(),
   adoptLegacyTeam: z.boolean().optional(),
+  requireLegacyNameMatch: z.boolean().optional(),
   redirectTo: z
     .string()
     .refine(isSafeRedirectPath, "Must be an absolute path within this app")
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
           parsed.data.workspaceName ?? parsed.data.workspaceId,
           db,
           parsed.data.adoptLegacyTeam ?? false,
+          parsed.data.requireLegacyNameMatch ?? false,
         )
       : undefined;
   } catch (error) {

@@ -67,7 +67,21 @@ describe("Noyra workspace binding", () => {
       select: { id: true, email: true },
     });
     expect(mocks.ensureTeam).toHaveBeenCalledWith(
-      12, "ws-1", "My workspace", expect.anything(), true,
+      12, "ws-1", "My workspace", expect.anything(), true, false,
+    );
+  });
+
+  it("forwards strict legacy matching for an existing workspace", async () => {
+    const response = await POST(request({
+      email: "owner@example.com",
+      workspaceName: "EpicWave",
+      adoptLegacyTeam: true,
+      requireLegacyNameMatch: true,
+    }), params);
+
+    expect(response.status).toBe(200);
+    expect(mocks.ensureTeam).toHaveBeenCalledWith(
+      12, "ws-1", "EpicWave", expect.anything(), true, true,
     );
   });
 

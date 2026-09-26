@@ -39,6 +39,15 @@ describe("Noyra workspace team mapping", () => {
       .rejects.toBeInstanceOf(NoyraWorkspaceConflictError);
   });
 
+  it("flags an already mapped empty team when the matching legacy team remains", async () => {
+    team.findUnique.mockResolvedValue({ id: 8, teamUsers: [{ userId: 12, role: "ADMIN" }] });
+    team.findFirst.mockResolvedValue({ id: 7 });
+
+    await expect(ensureNoyraWorkspaceTeam(12, "workspace-a", "EpicWave", undefined, true, true))
+      .rejects.toBeInstanceOf(NoyraWorkspaceConflictError);
+    expect(team.create).not.toHaveBeenCalled();
+  });
+
   it("adopts the sole legacy team for the first workspace", async () => {
     team.findMany.mockResolvedValue([{ id: 7 }]);
     team.updateMany.mockResolvedValue({ count: 1 });
@@ -59,6 +68,35 @@ describe("Noyra workspace team mapping", () => {
     await expect(ensureNoyraWorkspaceTeam(12, "workspace-a", "Workspace A"))
       .resolves.toBe(8);
     expect(team.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("adopts a uniquely named legacy team for an assigned workspace with siblings", async () => {
+    team.findFirst.mockResolvedValue({ id: 9 });
+    team.findMany.mockResolvedValue([{ id: 7 }]);
+    team.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(ensureNoyraWorkspaceTeam(12, "workspace-a", "EpicWave", undefined, true, true))
+      .resolves.toBe(7);
+    expect(team.findMany).toHaveBeenCalledWith({
+      where: {
+        noyraWorkspaceId: null,
+        teamUsers: { some: { userId: 12, role: "ADMIN" } },
+        name: { equals: "EpicWave", mode: "insensitive" },
+      },
+      select: { id: true },
+      take: 2,
+    });
+    expect(team.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, noyraWorkspaceId: null },
+      data: { noyraWorkspaceId: "workspace-a" },
+    });
+    expect(team.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses to create an empty team when an assigned workspace has no safe legacy match", async () => {
+    await expect(ensureNoyraWorkspaceTeam(12, "workspace-a", "EpicWave", undefined, true, true))
+      .rejects.toBeInstanceOf(NoyraWorkspaceConflictError);
+    expect(team.create).not.toHaveBeenCalled();
   });
 
   it("does not replace an existing account with a new team when adoption is ambiguous", async () => {

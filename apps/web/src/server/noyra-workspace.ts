@@ -17,6 +17,7 @@ export async function ensureNoyraWorkspaceTeam(
   workspaceName: string,
   client: WorkspaceClient = db,
   adoptLegacyTeam = false,
+  requireLegacyNameMatch = false,
 ): Promise<number> {
   const existing = await client.team.findUnique({
     where: { noyraWorkspaceId: workspaceId },
@@ -24,19 +25,40 @@ export async function ensureNoyraWorkspaceTeam(
   });
   if (existing) {
     if (existing.teamUsers.length === 0) throw new NoyraWorkspaceConflictError();
+    if (requireLegacyNameMatch) {
+      const legacyMatch = await client.team.findFirst({
+        where: {
+          noyraWorkspaceId: null,
+          name: { equals: workspaceName, mode: "insensitive" },
+          teamUsers: { some: { userId, role: "ADMIN" } },
+        },
+        select: { id: true },
+      });
+      if (legacyMatch) {
+        throw new NoyraWorkspaceConflictError("Workspace is linked to a new team while its legacy team remains unlinked");
+      }
+    }
     return existing.id;
   }
 
-  const linkedTeam = await client.team.findFirst({
-    where: { noyraWorkspaceId: { not: null }, teamUsers: { some: { userId } } },
-    select: { id: true },
-  });
   if (adoptLegacyTeam) {
-    if (linkedTeam) {
-      throw new NoyraWorkspaceConflictError("This useSend account already has another linked workspace");
+    if (!requireLegacyNameMatch) {
+      const linkedTeam = await client.team.findFirst({
+        where: { noyraWorkspaceId: { not: null }, teamUsers: { some: { userId } } },
+        select: { id: true },
+      });
+      if (linkedTeam) {
+        throw new NoyraWorkspaceConflictError("This useSend account already has another linked workspace");
+      }
     }
     const legacyTeams = await client.team.findMany({
-      where: { noyraWorkspaceId: null, teamUsers: { some: { userId, role: "ADMIN" } } },
+      where: {
+        noyraWorkspaceId: null,
+        teamUsers: { some: { userId, role: "ADMIN" } },
+        ...(requireLegacyNameMatch
+          ? { name: { equals: workspaceName, mode: "insensitive" as const } }
+          : {}),
+      },
       select: { id: true },
       take: 2,
     });
@@ -55,6 +77,9 @@ export async function ensureNoyraWorkspaceTeam(
     }
     if (legacyTeams.length > 1) {
       throw new NoyraWorkspaceConflictError("This useSend account has multiple teams; select one before linking");
+    }
+    if (requireLegacyNameMatch) {
+      throw new NoyraWorkspaceConflictError("No uniquely matching legacy team; select the existing team before linking");
     }
   }
 

@@ -12,6 +12,7 @@ const bindSchema = z.object({
   email: z.string().email(),
   workspaceName: z.string().trim().min(1).max(100),
   adoptLegacyTeam: z.boolean(),
+  requireLegacyNameMatch: z.boolean().optional(),
 });
 
 export async function POST(
@@ -56,6 +57,7 @@ export async function POST(
       parsed.data.workspaceName,
       db,
       parsed.data.adoptLegacyTeam,
+      parsed.data.requireLegacyNameMatch ?? false,
     );
     return NextResponse.json({ workspaceId, teamId, userId: user.id, email: user.email });
   } catch (error) {
