@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { mockDb, mockWebhookService } = vi.hoisted(() => ({
   mockDb: {
     teamUser: {
-      findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
   },
   mockWebhookService: {
@@ -55,16 +55,16 @@ function getContext() {
 
 describe("webhookRouter domain filters", () => {
   beforeEach(() => {
-    mockDb.teamUser.findFirst.mockReset();
+    mockDb.teamUser.findMany.mockReset();
     mockWebhookService.createWebhook.mockReset();
     mockWebhookService.updateWebhook.mockReset();
 
-    mockDb.teamUser.findFirst.mockResolvedValue({
+    mockDb.teamUser.findMany.mockResolvedValue([{
       teamId: 10,
       userId: 42,
       role: "ADMIN",
       team: { id: 10, name: "Acme" },
-    });
+    }]);
 
     mockWebhookService.createWebhook.mockResolvedValue({
       id: "wh_1",

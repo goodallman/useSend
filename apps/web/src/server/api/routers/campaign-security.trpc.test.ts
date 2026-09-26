@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { mockDb, mockValidateDomainFromEmail } = vi.hoisted(() => ({
   mockDb: {
     teamUser: {
-      findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     campaign: {
       findUnique: vi.fn(),
@@ -54,18 +54,18 @@ function getContext() {
 
 describe("campaignRouter.updateCampaign authorization", () => {
   beforeEach(() => {
-    mockDb.teamUser.findFirst.mockReset();
+    mockDb.teamUser.findMany.mockReset();
     mockDb.campaign.findUnique.mockReset();
     mockDb.campaign.update.mockReset();
     mockDb.campaign.create.mockReset();
     mockDb.contactBook.findUnique.mockReset();
 
-    mockDb.teamUser.findFirst.mockResolvedValue({
+    mockDb.teamUser.findMany.mockResolvedValue([{
       teamId: 10,
       userId: 1,
       role: "ADMIN",
       team: { id: 10, name: "Acme" },
-    });
+    }]);
 
     mockDb.campaign.findUnique.mockResolvedValue({
       id: "camp_1",
@@ -112,16 +112,16 @@ describe("campaignRouter.updateCampaign authorization", () => {
 
 describe("campaignRouter.duplicateCampaign", () => {
   beforeEach(() => {
-    mockDb.teamUser.findFirst.mockReset();
+    mockDb.teamUser.findMany.mockReset();
     mockDb.campaign.findUnique.mockReset();
     mockDb.campaign.create.mockReset();
 
-    mockDb.teamUser.findFirst.mockResolvedValue({
+    mockDb.teamUser.findMany.mockResolvedValue([{
       teamId: 10,
       userId: 1,
       role: "ADMIN",
       team: { id: 10, name: "Acme" },
-    });
+    }]);
 
     mockDb.campaign.findUnique.mockResolvedValue({
       id: "camp_1",

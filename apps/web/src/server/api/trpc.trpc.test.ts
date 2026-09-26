@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { mockDb } = vi.hoisted(() => ({
   mockDb: {
     teamUser: {
-      findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
   },
 }));
@@ -61,7 +61,7 @@ const baseUser = {
 
 describe("tRPC middleware procedures", () => {
   beforeEach(() => {
-    mockDb.teamUser.findFirst.mockReset();
+    mockDb.teamUser.findMany.mockReset();
   });
 
   it("blocks authed procedure without session", async () => {
@@ -101,12 +101,12 @@ describe("tRPC middleware procedures", () => {
   });
 
   it("loads team context for team procedure", async () => {
-    mockDb.teamUser.findFirst.mockResolvedValue({
+    mockDb.teamUser.findMany.mockResolvedValue([{
       teamId: 10,
       userId: 1,
       role: "ADMIN",
       team: { id: 10, name: "Acme" },
-    });
+    }]);
 
     const caller = createCaller(
       getContext({
@@ -118,12 +118,12 @@ describe("tRPC middleware procedures", () => {
   });
 
   it("blocks team admin procedure for non-admin team users", async () => {
-    mockDb.teamUser.findFirst.mockResolvedValue({
+    mockDb.teamUser.findMany.mockResolvedValue([{
       teamId: 10,
       userId: 1,
       role: "MEMBER",
       team: { id: 10, name: "Acme" },
-    });
+    }]);
 
     const caller = createCaller(
       getContext({
@@ -137,7 +137,7 @@ describe("tRPC middleware procedures", () => {
   });
 
   it("fails team procedure when user has no team", async () => {
-    mockDb.teamUser.findFirst.mockResolvedValue(null);
+    mockDb.teamUser.findMany.mockResolvedValue([]);
 
     const caller = createCaller(
       getContext({
