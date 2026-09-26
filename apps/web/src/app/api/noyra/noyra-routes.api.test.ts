@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => {
   return {
     authorizationStatus: vi.fn(),
     createMagicLoginLink: vi.fn(),
+    ensureWorkspaceTeam: vi.fn(),
     userFindFirst,
     transactionUserCreate,
     transaction,
@@ -27,6 +28,11 @@ vi.mock("~/server/auth/magic-link", () => ({
   createMagicLoginLink: mocks.createMagicLoginLink,
   isSafeRedirectPath: (value: string) =>
     value.startsWith("/") && !value.startsWith("//"),
+}));
+
+vi.mock("~/server/noyra-workspace", () => ({
+  ensureNoyraWorkspaceTeam: mocks.ensureWorkspaceTeam,
+  NoyraWorkspaceConflictError: class extends Error {},
 }));
 
 vi.mock("~/server/db", () => ({
@@ -69,6 +75,7 @@ describe("Noyra account routes", () => {
       createdAt: new Date("2026-07-22T10:00:00.000Z"),
     });
     mocks.createMagicLoginLink.mockResolvedValue(magicLink);
+    mocks.ensureWorkspaceTeam.mockResolvedValue(42);
   });
 
   it("rejects account provisioning without Noyra authorization", async () => {
@@ -124,6 +131,23 @@ describe("Noyra account routes", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("binds a new account login to its Noyra workspace team", async () => {
+    const response = await createAccount(post("/api/noyra/accounts", {
+      email: "user@example.com",
+      workspaceId: "workspace-1",
+      workspaceName: "First workspace",
+    }));
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({ teamId: 42 });
+    expect(mocks.ensureWorkspaceTeam).toHaveBeenCalledWith(
+      7, "workspace-1", "First workspace", expect.anything(), false,
+    );
+    expect(mocks.createMagicLoginLink).toHaveBeenCalledWith(
+      7, undefined, expect.anything(), 42,
+    );
+  });
+
   it("issues another login link for an existing account", async () => {
     mocks.userFindFirst.mockResolvedValue({
       id: 7,
@@ -153,5 +177,36 @@ describe("Noyra account routes", () => {
 
     expect(response.status).toBe(400);
     expect(mocks.userFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("binds an existing account login to its Noyra workspace team", async () => {
+    mocks.userFindFirst.mockResolvedValue({ id: 7, email: "user@example.com", name: "User" });
+    const response = await createLoginLink(post("/api/noyra/login-links", {
+      email: "user@example.com",
+      workspaceId: "workspace-2",
+      workspaceName: "Second workspace",
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ teamId: 42 });
+    expect(mocks.ensureWorkspaceTeam).toHaveBeenCalledWith(
+      7, "workspace-2", "Second workspace", expect.anything(), false,
+    );
+    expect(mocks.createMagicLoginLink).toHaveBeenCalledWith(7, undefined, expect.anything(), 42);
+  });
+
+  it("permits an existing single-workspace account to adopt its legacy team", async () => {
+    mocks.userFindFirst.mockResolvedValue({ id: 7, email: "user@example.com", name: "User" });
+    const response = await createLoginLink(post("/api/noyra/login-links", {
+      email: "user@example.com",
+      workspaceId: "workspace-1",
+      workspaceName: "Existing workspace",
+      adoptLegacyTeam: true,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.ensureWorkspaceTeam).toHaveBeenCalledWith(
+      7, "workspace-1", "Existing workspace", expect.anything(), true,
+    );
   });
 });

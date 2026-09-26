@@ -7,17 +7,24 @@ import {
 } from "~/server/auth/magic-link";
 import { db } from "~/server/db";
 import { getNoyraAuthorizationStatus } from "~/server/noyra-api-auth";
+import {
+  ensureNoyraWorkspaceTeam,
+  NoyraWorkspaceConflictError,
+} from "~/server/noyra-workspace";
 
 const createAccountSchema = z.object({
   email: z.string().email(),
   name: z.string().trim().min(1).max(100).optional(),
+  workspaceId: z.string().trim().min(1).max(200).optional(),
+  workspaceName: z.string().trim().min(1).max(100).optional(),
+  adoptLegacyTeam: z.boolean().optional(),
   redirectTo: z
     .string()
     .refine(isSafeRedirectPath, "Must be an absolute path within this app")
     .optional(),
 });
 
-type NoyraTransactionClient = Pick<typeof db, "user" | "verificationToken">;
+type NoyraTransactionClient = Pick<typeof db, "user" | "team" | "verificationToken">;
 
 export async function POST(request: Request) {
   const authorization = getNoyraAuthorizationStatus(request);
@@ -85,17 +92,27 @@ export async function POST(request: Request) {
           createdAt: true,
         },
       });
-      const magicLink = await createMagicLoginLink(
-        user.id,
-        parsed.data.redirectTo,
-        tx,
-      );
+      const teamId = parsed.data.workspaceId
+        ? await ensureNoyraWorkspaceTeam(
+            user.id,
+            parsed.data.workspaceId,
+            parsed.data.workspaceName ?? parsed.data.workspaceId,
+            tx,
+            parsed.data.adoptLegacyTeam ?? false,
+          )
+        : undefined;
+      const magicLink = teamId
+        ? await createMagicLoginLink(user.id, parsed.data.redirectTo, tx, teamId)
+        : await createMagicLoginLink(user.id, parsed.data.redirectTo, tx);
 
-      return { user, magicLink };
+      return { user, magicLink, teamId };
     });
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
+    if (error instanceof NoyraWorkspaceConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     if (hasErrorCode(error, "P2002")) {
       return NextResponse.json(
         { error: "An account with this email already exists" },

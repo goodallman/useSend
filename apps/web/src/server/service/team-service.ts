@@ -100,9 +100,10 @@ export class TeamService {
     return updated;
   }
 
-  static async getUserTeams(userId: number) {
+  static async getUserTeams(userId: number, teamId?: number) {
     return db.team.findMany({
       where: {
+        ...(teamId ? { id: teamId } : {}),
         teamUsers: {
           some: {
             userId: userId,

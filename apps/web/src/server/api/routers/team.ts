@@ -16,7 +16,7 @@ export const teamRouter = createTRPCRouter({
     }),
 
   getTeams: protectedProcedure.query(async ({ ctx }) => {
-    return TeamService.getUserTeams(ctx.session.user.id);
+    return TeamService.getUserTeams(ctx.session.user.id, ctx.session.user.teamId);
   }),
 
   getTeamUsers: teamProcedure.query(async ({ ctx }) => {

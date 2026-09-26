@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   verificationTokenDelete: vi.fn(),
   userFindUnique: vi.fn(),
+  teamUserFindUnique: vi.fn(),
 }));
 
 vi.mock("next-auth", () => ({
@@ -20,6 +21,9 @@ vi.mock("~/server/db", () => ({
     },
     user: {
       findUnique: mocks.userFindUnique,
+    },
+    teamUser: {
+      findUnique: mocks.teamUserFindUnique,
     },
   },
 }));
@@ -63,6 +67,7 @@ describe("magic-link authentication", () => {
       expires: new Date(Date.now() + 60_000),
     });
     mocks.userFindUnique.mockResolvedValue(user);
+    mocks.teamUserFindUnique.mockResolvedValue({ teamId: 42, userId: 12 });
   });
 
   it("only configures the credentials provider with JWT sessions", () => {
@@ -83,6 +88,34 @@ describe("magic-link authentication", () => {
       where: { token: "hashed:raw-token" },
     });
     expect(mocks.userFindUnique).toHaveBeenCalledWith({ where: { id: 12 } });
+  });
+
+  it("binds a workspace token to the user's team membership", async () => {
+    mocks.verificationTokenDelete.mockResolvedValue({
+      identifier: "noyra-user:12:team:42",
+      token: "hashed:raw-token",
+      expires: new Date(Date.now() + 60_000),
+    });
+
+    await expect(authorize({ token: "raw-token" })).resolves.toMatchObject({
+      id: 12,
+      teamId: 42,
+    });
+    expect(mocks.teamUserFindUnique).toHaveBeenCalledWith({
+      where: { teamId_userId: { teamId: 42, userId: 12 } },
+    });
+  });
+
+  it("rejects a workspace token when team membership is missing", async () => {
+    mocks.verificationTokenDelete.mockResolvedValue({
+      identifier: "noyra-user:12:team:42",
+      token: "hashed:raw-token",
+      expires: new Date(Date.now() + 60_000),
+    });
+    mocks.teamUserFindUnique.mockResolvedValue(null);
+
+    await expect(authorize({ token: "raw-token" })).resolves.toBeNull();
+    expect(mocks.userFindUnique).not.toHaveBeenCalled();
   });
 
   it("rejects an expired token after consuming it", async () => {

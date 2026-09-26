@@ -31,6 +31,7 @@ declare module "next-auth" {
       isBetaUser: boolean;
       isAdmin: boolean;
       isWaitlisted: boolean;
+      teamId?: number;
     } & DefaultSession["user"];
   }
 
@@ -40,6 +41,7 @@ declare module "next-auth" {
     isBetaUser: boolean;
     isAdmin: boolean;
     isWaitlisted: boolean;
+    teamId?: number;
   }
 }
 
@@ -49,6 +51,7 @@ declare module "next-auth/jwt" {
     id: number;
     isBetaUser: boolean;
     isWaitlisted: boolean;
+    teamId?: number;
   }
 }
 
@@ -66,6 +69,7 @@ export const authOptions: NextAuthOptions = {
         token.id = Number(user.id);
         token.isBetaUser = user.isBetaUser;
         token.isWaitlisted = user.isWaitlisted;
+        token.teamId = user.teamId;
       }
 
       return token;
@@ -78,6 +82,7 @@ export const authOptions: NextAuthOptions = {
         isBetaUser: token.isBetaUser,
         isAdmin: token.email === env.ADMIN_EMAIL,
         isWaitlisted: token.isWaitlisted,
+        teamId: token.teamId,
       },
     }),
   },
@@ -117,11 +122,21 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const userId = Number(
+        const identity = /^(\d+)(?::team:(\d+))?$/.exec(
           magicToken.identifier.slice(MAGIC_LOGIN_IDENTIFIER_PREFIX.length),
         );
+        if (!identity) return null;
+        const userId = Number(identity[1]);
+        const teamId = identity[2] ? Number(identity[2]) : undefined;
         if (!Number.isSafeInteger(userId)) {
           return null;
+        }
+        if (teamId !== undefined) {
+          if (!Number.isSafeInteger(teamId)) return null;
+          const membership = await db.teamUser.findUnique({
+            where: { teamId_userId: { teamId, userId } },
+          });
+          if (!membership) return null;
         }
 
         const user = await db.user.findUnique({ where: { id: userId } });
@@ -135,6 +150,7 @@ export const authOptions: NextAuthOptions = {
           isBetaUser: user.isBetaUser,
           isWaitlisted: user.isWaitlisted,
           isAdmin: user.email === env.ADMIN_EMAIL,
+          teamId,
         };
       },
     }),

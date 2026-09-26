@@ -7,9 +7,16 @@ import {
 } from "~/server/auth/magic-link";
 import { db } from "~/server/db";
 import { getNoyraAuthorizationStatus } from "~/server/noyra-api-auth";
+import {
+  ensureNoyraWorkspaceTeam,
+  NoyraWorkspaceConflictError,
+} from "~/server/noyra-workspace";
 
 const createLoginLinkSchema = z.object({
   email: z.string().email(),
+  workspaceId: z.string().trim().min(1).max(200).optional(),
+  workspaceName: z.string().trim().min(1).max(100).optional(),
+  adoptLegacyTeam: z.boolean().optional(),
   redirectTo: z
     .string()
     .refine(isSafeRedirectPath, "Must be an absolute path within this app")
@@ -65,7 +72,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
 
-  const magicLink = await createMagicLoginLink(user.id, parsed.data.redirectTo);
+  let teamId: number | undefined;
+  try {
+    teamId = parsed.data.workspaceId
+      ? await ensureNoyraWorkspaceTeam(
+          user.id,
+          parsed.data.workspaceId,
+          parsed.data.workspaceName ?? parsed.data.workspaceId,
+          db,
+          parsed.data.adoptLegacyTeam ?? false,
+        )
+      : undefined;
+  } catch (error) {
+    if (error instanceof NoyraWorkspaceConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    throw error;
+  }
+  const magicLink = teamId
+    ? await createMagicLoginLink(user.id, parsed.data.redirectTo, db, teamId)
+    : await createMagicLoginLink(user.id, parsed.data.redirectTo);
 
-  return NextResponse.json({ user, magicLink });
+  return NextResponse.json({ user, magicLink, teamId });
 }

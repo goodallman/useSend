@@ -458,7 +458,7 @@ async function executeEmail(job: QueueEmailJob) {
     // Delete attachments and headers after sending the email
     await db.email.update({
       where: { id: email.id },
-      data: { sesEmailId: messageId, text, attachments: null, headers: null },
+      data: { sesEmailId: messageId, sentAt: new Date(), text, attachments: null, headers: null },
     });
   } catch (error: any) {
     await db.emailEvent.create({

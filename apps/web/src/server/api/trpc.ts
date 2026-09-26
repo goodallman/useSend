@@ -123,10 +123,18 @@ export const protectedProcedure = authedProcedure.use(({ ctx, next }) => {
 });
 
 export const teamProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  const teamUser = await db.teamUser.findFirst({
-    where: { userId: ctx.session.user.id },
-    include: { team: true },
-  });
+  const memberships = ctx.session.user.teamId
+    ? await db.teamUser.findMany({
+        where: { userId: ctx.session.user.id, teamId: ctx.session.user.teamId },
+        include: { team: true },
+        take: 1,
+      })
+    : await db.teamUser.findMany({
+        where: { userId: ctx.session.user.id },
+        include: { team: true },
+        take: 2,
+      });
+  const teamUser = memberships.length === 1 ? memberships[0] : null;
 
   if (!teamUser) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });

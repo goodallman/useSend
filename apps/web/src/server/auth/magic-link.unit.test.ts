@@ -64,4 +64,17 @@ describe("magic login links", () => {
     expect(isSafeRedirectPath("https://attacker.example")).toBe(false);
     expect(isSafeRedirectPath("//attacker.example")).toBe(false);
   });
+
+  it("stores the selected team in a workspace login token", async () => {
+    const result = await createMagicLoginLink(42, "/dashboard", undefined, 7);
+    const token = new URL(result.url).searchParams.get("token");
+
+    expect(mocks.verificationTokenCreate).toHaveBeenCalledWith({
+      data: {
+        identifier: `${MAGIC_LOGIN_IDENTIFIER_PREFIX}42:team:7`,
+        token: hashMagicLoginToken(token!),
+        expires: result.expiresAt,
+      },
+    });
+  });
 });

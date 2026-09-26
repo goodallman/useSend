@@ -21,13 +21,14 @@ export async function createMagicLoginLink(
   userId: number,
   redirectTo = "/dashboard",
   client: VerificationTokenClient = db,
+  teamId?: number,
 ) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + MAGIC_LOGIN_TTL_MS);
 
   await client.verificationToken.create({
     data: {
-      identifier: `${MAGIC_LOGIN_IDENTIFIER_PREFIX}${userId}`,
+      identifier: `${MAGIC_LOGIN_IDENTIFIER_PREFIX}${userId}${teamId ? `:team:${teamId}` : ""}`,
       token: hashMagicLoginToken(token),
       expires: expiresAt,
     },

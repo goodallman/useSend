@@ -101,6 +101,7 @@ enum Plan {
 model Team {
   id               Int               @id @default(autoincrement())
   name             String
+  noyraWorkspaceId String?           @unique
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   plan             Plan              @default(FREE)
@@ -257,6 +258,7 @@ model Email {
   apiId        Int?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+  sentAt       DateTime?
   scheduledAt  DateTime?
   attachments  String?
   campaignId   String?
@@ -268,6 +270,7 @@ model Email {
 
   @@index([campaignId, contactId])
   @@index([createdAt(sort: Desc)])
+  @@index([teamId, sentAt])
 }
 
 model CampaignEmail {

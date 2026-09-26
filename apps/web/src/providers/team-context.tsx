@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import { api } from "~/trpc/react";
+import { useSession } from "next-auth/react";
 
 // Define the Team type based on the Prisma schema
 type Team = {
@@ -25,9 +26,12 @@ interface TeamContextType {
 const TeamContext = createContext<TeamContextType | undefined>(undefined);
 
 export function TeamProvider({ children }: { children: React.ReactNode }) {
+  const { data: session } = useSession();
   const { data: teams, status } = api.team.getTeams.useQuery();
 
-  const currentTeam = teams?.[0] ?? null;
+  const currentTeam = session?.user.teamId
+    ? teams?.find((team) => team.id === session.user.teamId) ?? null
+    : teams?.[0] ?? null;
 
   const value = {
     currentTeam,
