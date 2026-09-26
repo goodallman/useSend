@@ -689,51 +689,6 @@ export const ReactEmailEditor = forwardRef<
     ref.editor?.on("selectionUpdate", notifySelection);
     ref.editor?.on("update", notifySelection);
     const editorElement = ref.editor?.view.dom;
-    const handleTextBlockEnter = (event: KeyboardEvent) => {
-      if (
-        event.key !== "Enter" ||
-        event.shiftKey ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.isComposing ||
-        !ref.editor ||
-        editorElement?.ownerDocument.querySelector("[data-re-slash-command]")
-      ) {
-        return;
-      }
-
-      const editor = ref.editor;
-      const { selection } = editor.state;
-      if (!selection.$from.parent.isTextblock) return;
-      const before = editor.state.doc;
-
-      const inListItem =
-        selection.$from.node(selection.$from.depth - 1)?.type.name ===
-        "listItem";
-      let handled =
-        inListItem &&
-        selection.$from.parent.content.size === 0 &&
-        editor.can().liftListItem("listItem")
-          ? editor.commands.liftListItem("listItem")
-          : inListItem && editor.can().splitListItem("listItem")
-            ? editor.commands.splitListItem("listItem")
-            : editor.commands.splitBlock();
-      if (!handled || editor.state.doc.eq(before)) {
-        handled =
-          editor
-            .chain()
-            .focus()
-            .insertContentAt(selection.$from.after(selection.$from.depth), {
-              type: "paragraph",
-            })
-            .run() || handled;
-      }
-      if (handled) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-    };
     const selectClickedButton = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
@@ -792,14 +747,12 @@ export const ReactEmailEditor = forwardRef<
       event.preventDefault();
       ref.editor.chain().focus().setNodeSelection(buttonPosition).run();
     };
-    editorElement?.addEventListener("keydown", handleTextBlockEnter, true);
     editorElement?.addEventListener("pointerdown", selectClickedButton, true);
     editorElement?.addEventListener("mousedown", selectClickedButton, true);
     editorElement?.addEventListener("click", selectClickedButton, true);
     selectionCleanupRef.current = () => {
       ref.editor?.off("selectionUpdate", notifySelection);
       ref.editor?.off("update", notifySelection);
-      editorElement?.removeEventListener("keydown", handleTextBlockEnter, true);
       editorElement?.removeEventListener(
         "pointerdown",
         selectClickedButton,
