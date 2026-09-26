@@ -288,3 +288,121 @@ it("treats a selected layout as a block rather than selected text", async () => 
   expect(states.at(-1)?.selectedBlock?.isSelected).toBe(true);
   expect(states.at(-1)?.hasTextSelection).toBe(false);
 });
+
+it("splits an empty paragraph when another shortcut consumes Enter", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  mounted.push(() => {
+    act(() => root.unmount());
+    host.remove();
+  });
+  let editor: ReactEmailEditorRef | null = null;
+
+  await act(async () => {
+    root.render(
+      React.createElement(ReactEmailEditor, {
+        content: {
+          type: "doc",
+          content: [{ type: "paragraph" }, { type: "paragraph" }],
+        },
+        onReady: (value) => {
+          editor = value;
+        },
+      }),
+    );
+  });
+  await vi.waitFor(() => expect(editor).not.toBeNull());
+  const content = host.querySelector<HTMLElement>(".tiptap")!;
+  const paragraph = content.querySelectorAll("p")[1]!;
+  content.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Enter") event.stopImmediatePropagation();
+    },
+    true,
+  );
+
+  await act(async () => {
+    content.focus();
+    window.getSelection()!.collapse(paragraph, 0);
+    content.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        code: "Enter",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await Promise.resolve();
+  });
+
+  expect(content.querySelectorAll("p")).toHaveLength(3);
+});
+
+it("keeps list structure when the Enter fallback runs", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  mounted.push(() => {
+    act(() => root.unmount());
+    host.remove();
+  });
+  let editor: ReactEmailEditorRef | null = null;
+
+  await act(async () => {
+    root.render(
+      React.createElement(ReactEmailEditor, {
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "bulletList",
+              content: [
+                {
+                  type: "listItem",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Hello" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        onReady: (value) => {
+          editor = value;
+        },
+      }),
+    );
+  });
+  await vi.waitFor(() => expect(editor).not.toBeNull());
+  const content = host.querySelector<HTMLElement>(".tiptap")!;
+  content.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Enter") event.stopImmediatePropagation();
+    },
+    true,
+  );
+
+  await act(async () => {
+    content.focus();
+    window
+      .getSelection()!
+      .collapse(content.querySelector("li p")!.firstChild!, 5);
+    content.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        code: "Enter",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await Promise.resolve();
+  });
+
+  expect(content.querySelectorAll("li")).toHaveLength(2);
+});
