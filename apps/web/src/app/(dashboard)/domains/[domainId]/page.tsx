@@ -24,7 +24,7 @@ import React, { use } from "react";
 import { Switch } from "@usesend/ui/src/switch";
 import DeleteDomain from "./delete-domain";
 import SendTestMail from "./send-test-mail";
-import { Button } from "@usesend/ui/src/button";
+import { VerifyDomain } from "./verify-domain";
 import Link from "next/link";
 import { toast } from "@usesend/ui/src/toaster";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -49,19 +49,6 @@ export default function DomainItemPage({
       refetchIntervalInBackground: true,
     },
   );
-
-  const verifyQuery = api.domain.startVerification.useMutation();
-
-  const handleVerify = () => {
-    verifyQuery.mutate(
-      { id: Number(domainId) },
-      {
-        onSettled: () => {
-          domainQuery.refetch();
-        },
-      },
-    );
-  };
 
   return (
     <div>
@@ -99,20 +86,20 @@ export default function DomainItemPage({
               </div>
             </div>
             <div className="flex gap-4">
-              <div>
-                <Button variant="outline" onClick={handleVerify}>
-                  {domainQuery.data?.isVerifying
-                    ? "Verifying..."
-                    : domainQuery.data?.status === DomainStatus.SUCCESS
-                      ? "Verify again"
-                      : "Verify domain"}
-                </Button>
-              </div>
+              {domainQuery.data ? (
+                <VerifyDomain domain={domainQuery.data} />
+              ) : null}
               {domainQuery.data ? (
                 <SendTestMail domain={domainQuery.data} />
               ) : null}
             </div>
           </div>
+
+          {domainQuery.error ? (
+            <p role="alert" className="text-sm text-destructive">
+              Could not refresh domain verification: {domainQuery.error.message}
+            </p>
+          ) : null}
 
           <div className=" border rounded-lg p-4 shadow">
             <p className="font-semibold text-xl">DNS records</p>

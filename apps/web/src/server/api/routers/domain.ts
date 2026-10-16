@@ -12,6 +12,7 @@ import {
   deleteDomain,
   getDomain,
   getDomains,
+  refreshDomainVerification,
   updateDomain,
 } from "~/server/service/domain-service";
 import { sendEmail } from "~/server/service/email-service";
@@ -38,11 +39,8 @@ export const domainRouter = createTRPCRouter({
       );
     }),
 
-  startVerification: domainProcedure.mutation(async ({ ctx, input }) => {
-    await ctx.db.domain.update({
-      where: { id: input.id },
-      data: { isVerifying: true },
-    });
+  startVerification: domainProcedure.mutation(({ ctx }) => {
+    return refreshDomainVerification(ctx.domain);
   }),
 
   domains: teamProcedure.query(async ({ ctx }) => {
