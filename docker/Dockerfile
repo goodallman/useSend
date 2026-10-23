@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine3.20 AS base
-
+FROM node:22.23.4-alpine3.23 AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME/bin:$PATH"
 ENV SKIP_ENV_VALIDATION="true"
